@@ -65,7 +65,9 @@
                 team_b: m.team_b,
                 is_knockout: m.is_knockout,
                 result: m.result,
-                aet_result: m.aet_result
+                aet_result: m.aet_result,
+                score_a: m.score_a !== undefined ? m.score_a : null,
+                score_b: m.score_b !== undefined ? m.score_b : null
               }) %>)">
                 <%= m.result ? '✏️ Edit' : '+ Enter' %>
               </button>
@@ -89,7 +91,18 @@
     <h3 style="margin-bottom:20px;font-size:1rem" id="modalTitle">Enter Result</h3>
     <form method="POST" id="resultForm">
       <div class="form-group">
-        <label class="form-label">Result</label>
+        <label class="form-label">Score (optional)</label>
+        <div style="display:grid;grid-template-columns:1fr auto 1fr;align-items:center;gap:8px">
+          <input type="number" name="score_a" id="score_a" class="form-control" min="0" max="99" placeholder="0" style="text-align:center">
+          <span style="color:var(--text-dim);font-weight:700;padding:0 4px">–</span>
+          <input type="number" name="score_b" id="score_b" class="form-control" min="0" max="99" placeholder="0" style="text-align:center">
+        </div>
+        <div id="scoreTeamLabels" style="display:grid;grid-template-columns:1fr auto 1fr;font-size:.72rem;color:var(--text-dim);margin-top:3px;text-align:center">
+          <span id="scoreLabel_a"></span><span></span><span id="scoreLabel_b"></span>
+        </div>
+      </div>
+      <div class="form-group">
+        <label class="form-label">Result (winner)</label>
         <select name="result" id="resultSelect" class="form-control" required>
           <option value="">— Select result —</option>
           <option value="team_a" id="opt_team_a">Team A wins</option>
@@ -121,9 +134,12 @@ function openResultModal(match) {
   document.getElementById('modalTitle').textContent = match.team_a + ' vs ' + match.team_b;
   document.getElementById('opt_team_a').textContent = match.team_a + ' wins';
   document.getElementById('opt_team_b').textContent = match.team_b + ' wins';
+  document.getElementById('scoreLabel_a').textContent = match.team_a;
+  document.getElementById('scoreLabel_b').textContent = match.team_b;
+  document.getElementById('score_a').value = match.score_a !== null ? match.score_a : '';
+  document.getElementById('score_b').value = match.score_b !== null ? match.score_b : '';
   document.getElementById('resultSelect').value = match.result || '';
   document.getElementById('resultForm').action = '/admin/results/' + match.id;
-  // Show/hide AET based on knockout + result
   const aetGroup = document.getElementById('aetGroup');
   const optDraw = document.querySelector('#resultSelect option[value="draw"]');
   if (match.is_knockout) {

@@ -11,10 +11,6 @@ function logAction(db, adminId, action, details) {
   db.prepare('INSERT INTO admin_log (admin_id, action, details) VALUES (?, ?, ?)').run(adminId, action, details || null);
 }
 
-// ── Matchday boundaries (match_num ranges, group stage only) ──────────────────
-// MD1: matches 1-24, MD2: 25-48, MD3: 49-72
-const MD = { md1: [1,24], md2: [25,48], md3: [49,72] };
-
 // ── Admin Dashboard ───────────────────────────────────────────────────────────
 router.get('/', (req, res) => {
   const db = getDb();
@@ -24,16 +20,20 @@ router.get('/', (req, res) => {
   const lockedCount  = db.prepare("SELECT COUNT(*) as c FROM matches WHERE is_locked = 1").get().c;
   const totalPreds   = db.prepare("SELECT COUNT(*) as c FROM predictions").get().c;
 
-  // Per-matchday lock status (by match_num)
-  const mdQ  = (lo,hi) => db.prepare(`SELECT COUNT(*) as c FROM matches WHERE round='group' AND match_num BETWEEN ? AND ?`).get(lo,hi).c;
-  const mdQL = (lo,hi) => db.prepare(`SELECT COUNT(*) as c FROM matches WHERE round='group' AND match_num BETWEEN ? AND ? AND is_locked=1`).get(lo,hi).c;
+  // Precompute group match IDs ordered by time for matchday assignment
+  const gids = db.prepare("SELECT id FROM matches WHERE round='group' ORDER BY match_time, id").all().map(r => r.id);
+  const md1Ids = gids.slice(0, 24);
+  const md2Ids = gids.slice(24, 48);
+  const md3Ids = gids.slice(48);
+  const ic = ids => ids.length ? ids.join(',') : '0';
+
   const rndQ  = r => db.prepare(`SELECT COUNT(*) as c FROM matches WHERE round=?`).get(r).c;
   const rndQL = r => db.prepare(`SELECT COUNT(*) as c FROM matches WHERE round=? AND is_locked=1`).get(r).c;
 
   const lockStatus = {
-    group_md1: { total: mdQ(1,24),  locked: mdQL(1,24)  },
-    group_md2: { total: mdQ(25,48), locked: mdQL(25,48) },
-    group_md3: { total: mdQ(49,72), locked: mdQL(49,72) },
+    group_md1: { total: md1Ids.length, locked: db.prepare(`SELECT COUNT(*) as c FROM matches WHERE id IN (${ic(md1Ids)}) AND is_locked=1`).get().c },
+    group_md2: { total: md2Ids.length, locked: db.prepare(`SELECT COUNT(*) as c FROM matches WHERE id IN (${ic(md2Ids)}) AND is_locked=1`).get().c },
+    group_md3: { total: md3Ids.length, locked: db.prepare(`SELECT COUNT(*) as c FROM matches WHERE id IN (${ic(md3Ids)}) AND is_locked=1`).get().c },
     r32:   { total: rndQ('r32'),   locked: rndQL('r32')   },
     r16:   { total: rndQ('r16'),   locked: rndQL('r16')   },
     qf:    { total: rndQ('qf'),    locked: rndQL('qf')    },
@@ -173,15 +173,20 @@ router.post('/matches/lock-round', (req, res) => {
   const locked = action === 'lock' ? 1 : 0;
   let info, label;
 
+  const allGids = db.prepare("SELECT id FROM matches WHERE round='group' ORDER BY match_time, id").all().map(r => r.id);
+  const ic = ids => ids.length ? ids.join(',') : '0';
   if (round === 'group_md1') {
-    info = db.prepare(`UPDATE matches SET is_locked=? WHERE round='group' AND match_num BETWEEN 1 AND 24`).run(locked);
-    label = 'Group MD1 (Matches 1–24)';
+    const ids = allGids.slice(0, 24);
+    info = db.prepare(`UPDATE matches SET is_locked=? WHERE id IN (${ic(ids)})`).run(locked);
+    label = 'Group MD1 (Games 1–24)';
   } else if (round === 'group_md2') {
-    info = db.prepare(`UPDATE matches SET is_locked=? WHERE round='group' AND match_num BETWEEN 25 AND 48`).run(locked);
-    label = 'Group MD2 (Matches 25–48)';
+    const ids = allGids.slice(24, 48);
+    info = db.prepare(`UPDATE matches SET is_locked=? WHERE id IN (${ic(ids)})`).run(locked);
+    label = 'Group MD2 (Games 25–48)';
   } else if (round === 'group_md3') {
-    info = db.prepare(`UPDATE matches SET is_locked=? WHERE round='group' AND match_num BETWEEN 49 AND 72`).run(locked);
-    label = 'Group MD3 (Matches 49–72)';
+    const ids = allGids.slice(48);
+    info = db.prepare(`UPDATE matches SET is_locked=? WHERE id IN (${ic(ids)})`).run(locked);
+    label = 'Group MD3 (Games 49–72)';
   } else {
     info = db.prepare('UPDATE matches SET is_locked=? WHERE round=?').run(locked, round);
     label = round.toUpperCase();
@@ -203,13 +208,13 @@ router.get('/results', (req, res) => {
   let matches;
   if (round) {
     matches = db.prepare(`
-      SELECT m.*, r.result, r.aet_result FROM matches m
+      SELECT m.*, r.result, r.aet_result, r.score_a, r.score_b FROM matches m
       LEFT JOIN results r ON r.match_id = m.id
       WHERE m.round = ? ORDER BY m.match_time
     `).all(round);
   } else {
     matches = db.prepare(`
-      SELECT m.*, r.result, r.aet_result FROM matches m
+      SELECT m.*, r.result, r.aet_result, r.score_a, r.score_b FROM matches m
       LEFT JOIN results r ON r.match_id = m.id
       ORDER BY m.match_time
     `).all();
@@ -226,7 +231,7 @@ router.get('/results', (req, res) => {
 router.post('/results/:matchId', (req, res) => {
   const db = getDb();
   const matchId = parseInt(req.params.matchId);
-  const { result, aet_result } = req.body;
+  const { result, aet_result, score_a, score_b } = req.body;
 
   const match = db.prepare('SELECT * FROM matches WHERE id = ?').get(matchId);
   if (!match) { req.session.flashError = 'Match not found.'; return res.redirect('/admin/results'); }
@@ -242,16 +247,16 @@ router.post('/results/:matchId', (req, res) => {
   }
 
   const aetVal = match.is_knockout ? (aet_result || '90min') : null;
+  const sA = score_a !== '' && score_a !== undefined ? parseInt(score_a) : null;
+  const sB = score_b !== '' && score_b !== undefined ? parseInt(score_b) : null;
 
   db.prepare(`
-    INSERT INTO results (match_id, result, aet_result) VALUES (?, ?, ?)
-    ON CONFLICT (match_id) DO UPDATE SET result = excluded.result, aet_result = excluded.aet_result, entered_at = CURRENT_TIMESTAMP
-  `).run(matchId, result, aetVal);
+    INSERT INTO results (match_id, result, aet_result, score_a, score_b) VALUES (?, ?, ?, ?, ?)
+    ON CONFLICT (match_id) DO UPDATE SET result=excluded.result, aet_result=excluded.aet_result, score_a=excluded.score_a, score_b=excluded.score_b, entered_at=CURRENT_TIMESTAMP
+  `).run(matchId, result, aetVal, sA, sB);
 
-  // Auto-lock the match now that result is in
   db.prepare('UPDATE matches SET is_locked = 1 WHERE id = ?').run(matchId);
-
-  logAction(db, req.session.user.id, 'ENTER_RESULT', `Match #${matchId}: ${match.team_a} vs ${match.team_b} → ${result}${aetVal ? ' (' + aetVal + ')' : ''}`);
+  logAction(db, req.session.user.id, 'ENTER_RESULT', `Match #${matchId}: ${match.team_a} vs ${match.team_b} → ${result}${aetVal ? ' (' + aetVal + ')' : ''}${sA !== null ? ' (' + sA + '-' + sB + ')' : ''}`);
   req.session.flashSuccess = `Result entered for ${match.team_a} vs ${match.team_b}.`;
   res.redirect('/admin/results');
 });
@@ -535,8 +540,8 @@ router.post('/sync-scores', async (req, res) => {
   }
 
   const upsertResult = db.prepare(`
-    INSERT INTO results (match_id, result, aet_result) VALUES (?, ?, ?)
-    ON CONFLICT (match_id) DO UPDATE SET result=excluded.result, aet_result=excluded.aet_result, entered_at=CURRENT_TIMESTAMP
+    INSERT INTO results (match_id, result, aet_result, score_a, score_b) VALUES (?, ?, ?, ?, ?)
+    ON CONFLICT (match_id) DO UPDATE SET result=excluded.result, aet_result=excluded.aet_result, score_a=excluded.score_a, score_b=excluded.score_b, entered_at=CURRENT_TIMESTAMP
   `);
 
   const events = espnData.events || [];
@@ -587,7 +592,10 @@ router.post('/sync-scores', async (req, res) => {
       const isAET = /extra|aet|penalties|pen\b|pks/i.test(detail);
       const aetResult = match.is_knockout ? (isAET ? 'aet' : '90min') : null;
 
-      upsertResult.run(match.id, result, aetResult);
+      // Scores from ESPN perspective, adjust for team_a/team_b order in our DB
+      const saVal = !flipped ? homeScore : awayScore;
+      const sbVal = !flipped ? awayScore : homeScore;
+      upsertResult.run(match.id, result, aetResult, saVal, sbVal);
       db.prepare('UPDATE matches SET is_locked=1 WHERE id=?').run(match.id);
       synced++;
     } catch (_) { skipped++; }

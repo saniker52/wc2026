@@ -76,14 +76,22 @@ router.get('/dashboard', requireLogin, (req, res) => {
   });
 });
 
+// ── Knockout → official overall match number offset ───────────────────────────
+const KO_OFFSETS = { r32: 72, r16: 88, qf: 96, sf: 100, '3rd': 102, final: 103 };
+
 // ── Match list ────────────────────────────────────────────────────────────────
 router.get('/matches', requireLogin, (req, res) => {
   const db = getDb();
   const userId = req.session.user.id;
   const { round, group } = req.query;
 
+  // Precompute time-order rank for group matches → matchday assignment
+  const groupRanks = {};
+  db.prepare("SELECT id FROM matches WHERE round='group' ORDER BY match_time, id").all()
+    .forEach((r, i) => { groupRanks[r.id] = i + 1; });
+
   let query = `
-    SELECT m.*, r.result, r.aet_result, p.prediction, p.aet_prediction
+    SELECT m.*, r.result, r.aet_result, r.score_a, r.score_b, p.prediction, p.aet_prediction
     FROM matches m
     LEFT JOIN results r ON r.match_id = m.id
     LEFT JOIN predictions p ON p.match_id = m.id AND p.user_id = ?
@@ -101,7 +109,10 @@ router.get('/matches', requireLogin, (req, res) => {
     title: 'Match Predictions',
     matches: matches.map(m => {
       const pts = calculateMatchPoints(m, { result: m.result, aet_result: m.aet_result }, m);
-      return { ...m, match_time_kwt: toKuwaitTime(m.match_time), pts };
+      const timeRank = m.group_name ? (groupRanks[m.id] || 0) : 0;
+      const matchday = timeRank <= 24 ? 1 : timeRank <= 48 ? 2 : 3;
+      const officialNum = m.group_name ? timeRank : (KO_OFFSETS[m.round] || 0) + m.match_num;
+      return { ...m, match_time_kwt: toKuwaitTime(m.match_time), pts, matchday, officialNum };
     }),
     filter: { round, group },
     groups: 'ABCDEFGHIJKL'.split('')

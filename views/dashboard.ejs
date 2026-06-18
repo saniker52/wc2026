@@ -6,36 +6,20 @@
     <% if (flashSuccess) { %><div class="flash flash-success">✅ <%- flashSuccess %></div><% } %>
     <% if (flashError)   { %><div class="flash flash-error">⚠️ <%- flashError %></div><% } %>
 
-    <!-- Greeting + compact stats -->
+    <!-- Greeting + rank/points only -->
     <div style="margin-bottom:20px">
       <h1 style="font-size:1.5rem;font-weight:800">
         👋 <span style="color:var(--gold)"><%= user.display_name %></span>
         <span style="font-size:.9rem;font-weight:500;color:var(--text-dim)">· Chalet 1267 – WC 2026</span>
       </h1>
-      <div class="stats-grid" style="margin-top:12px">
-        <div class="stat-card">
+      <div style="display:flex;gap:14px;margin-top:14px;flex-wrap:wrap">
+        <div class="stat-card" style="flex:1;min-width:130px">
           <div class="stat-value" style="color:var(--gold)">🏆 #<%= stats.rank %></div>
-          <div class="stat-label">Rank<small style="color:var(--muted)"> / <%= stats.totalUsers %></small></div>
+          <div class="stat-label">Current Rank<small style="color:var(--muted)"> / <%= stats.totalUsers %></small></div>
         </div>
-        <div class="stat-card">
+        <div class="stat-card" style="flex:1;min-width:130px">
           <div class="stat-value"><%= stats.totalPts %></div>
-          <div class="stat-label">Total Pts</div>
-        </div>
-        <div class="stat-card">
-          <div class="stat-value" style="color:var(--blue)"><%= stats.groupPts %></div>
-          <div class="stat-label">Group Pts</div>
-        </div>
-        <div class="stat-card">
-          <div class="stat-value" style="color:#a78bfa"><%= stats.knockoutPts %></div>
-          <div class="stat-label">KO Pts</div>
-        </div>
-        <div class="stat-card">
-          <div class="stat-value" style="color:var(--gold)"><%= stats.bonusPts %></div>
-          <div class="stat-label">Bonus</div>
-        </div>
-        <div class="stat-card">
-          <div class="stat-value" style="color:var(--green)"><%= stats.correct %></div>
-          <div class="stat-label">Correct</div>
+          <div class="stat-label">Current Points</div>
         </div>
       </div>
     </div>

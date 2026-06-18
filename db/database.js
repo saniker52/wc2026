@@ -157,6 +157,10 @@ function seedInitialData() {
     console.log('✅ Award categories seeded');
   }
 
+  // ── Non-destructive schema additions ──────────────────────────────────────
+  try { db.exec('ALTER TABLE results ADD COLUMN score_a INTEGER'); } catch(_) {}
+  try { db.exec('ALTER TABLE results ADD COLUMN score_b INTEGER'); } catch(_) {}
+
   // ── Fixture migration ──────────────────────────────────────────────────────
   if (currentVersion < DB_VERSION) {
     console.log(`⚙️  Migrating fixtures to v${DB_VERSION}...`);
@@ -436,27 +440,26 @@ function computeLeaderboard(dbInstance) {
 // ── Kuwait time helper ─────────────────────────────────────────────────────────
 function toKuwaitTime(utcDateStr) {
   const d = new Date(utcDateStr);
-  return d.toLocaleString('en-KW', {
+  return d.toLocaleString('en-US', {
     timeZone: 'Asia/Kuwait',
     weekday: 'short',
-    year: 'numeric',
     month: 'short',
     day: 'numeric',
-    hour: '2-digit',
+    hour: 'numeric',
     minute: '2-digit',
-    hour12: false
+    hour12: true
   });
 }
 
 function toKuwaitTimeShort(utcDateStr) {
   const d = new Date(utcDateStr);
-  return d.toLocaleString('en-KW', {
+  return d.toLocaleString('en-US', {
     timeZone: 'Asia/Kuwait',
     month: 'short',
     day: 'numeric',
-    hour: '2-digit',
+    hour: 'numeric',
     minute: '2-digit',
-    hour12: false
+    hour12: true
   });
 }
 
