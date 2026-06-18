@@ -11,6 +11,10 @@ function logAction(db, adminId, action, details) {
   db.prepare('INSERT INTO admin_log (admin_id, action, details) VALUES (?, ?, ?)').run(adminId, action, details || null);
 }
 
+// ── Matchday date boundaries (UTC) ────────────────────────────────────────────
+const MD1_END = '2026-06-18T00:00:00Z';
+const MD2_END = '2026-06-24T00:00:00Z';
+
 // ── Admin Dashboard ───────────────────────────────────────────────────────────
 router.get('/', (req, res) => {
   const db = getDb();
@@ -19,6 +23,28 @@ router.get('/', (req, res) => {
   const resultsIn    = db.prepare("SELECT COUNT(*) as c FROM results").get().c;
   const lockedCount  = db.prepare("SELECT COUNT(*) as c FROM matches WHERE is_locked = 1").get().c;
   const totalPreds   = db.prepare("SELECT COUNT(*) as c FROM predictions").get().c;
+
+  // Per-matchday lock status
+  const lockStatus = {
+    group_md1: {
+      total: db.prepare(`SELECT COUNT(*) as c FROM matches WHERE round='group' AND match_time < ?`).get(MD1_END).c,
+      locked: db.prepare(`SELECT COUNT(*) as c FROM matches WHERE round='group' AND match_time < ? AND is_locked=1`).get(MD1_END).c,
+    },
+    group_md2: {
+      total: db.prepare(`SELECT COUNT(*) as c FROM matches WHERE round='group' AND match_time >= ? AND match_time < ?`).get(MD1_END, MD2_END).c,
+      locked: db.prepare(`SELECT COUNT(*) as c FROM matches WHERE round='group' AND match_time >= ? AND match_time < ? AND is_locked=1`).get(MD1_END, MD2_END).c,
+    },
+    group_md3: {
+      total: db.prepare(`SELECT COUNT(*) as c FROM matches WHERE round='group' AND match_time >= ?`).get(MD2_END).c,
+      locked: db.prepare(`SELECT COUNT(*) as c FROM matches WHERE round='group' AND match_time >= ? AND is_locked=1`).get(MD2_END).c,
+    },
+    r32:   { total: db.prepare(`SELECT COUNT(*) as c FROM matches WHERE round='r32'`).get().c,   locked: db.prepare(`SELECT COUNT(*) as c FROM matches WHERE round='r32' AND is_locked=1`).get().c },
+    r16:   { total: db.prepare(`SELECT COUNT(*) as c FROM matches WHERE round='r16'`).get().c,   locked: db.prepare(`SELECT COUNT(*) as c FROM matches WHERE round='r16' AND is_locked=1`).get().c },
+    qf:    { total: db.prepare(`SELECT COUNT(*) as c FROM matches WHERE round='qf'`).get().c,    locked: db.prepare(`SELECT COUNT(*) as c FROM matches WHERE round='qf' AND is_locked=1`).get().c },
+    sf:    { total: db.prepare(`SELECT COUNT(*) as c FROM matches WHERE round='sf'`).get().c,    locked: db.prepare(`SELECT COUNT(*) as c FROM matches WHERE round='sf' AND is_locked=1`).get().c },
+    '3rd': { total: db.prepare(`SELECT COUNT(*) as c FROM matches WHERE round='3rd'`).get().c,   locked: db.prepare(`SELECT COUNT(*) as c FROM matches WHERE round='3rd' AND is_locked=1`).get().c },
+    final: { total: db.prepare(`SELECT COUNT(*) as c FROM matches WHERE round='final'`).get().c, locked: db.prepare(`SELECT COUNT(*) as c FROM matches WHERE round='final' AND is_locked=1`).get().c },
+  };
 
   // Recent log
   const recentLog = db.prepare(`
@@ -38,6 +64,7 @@ router.get('/', (req, res) => {
   res.render('admin/dashboard', {
     title: 'Admin Dashboard',
     stats: { totalUsers, totalMatches, resultsIn, lockedCount, totalPreds },
+    lockStatus,
     recentLog,
     pendingResults: pendingResults.map(m => ({ ...m, match_time_kwt: toKuwaitTime(m.match_time) }))
   });
@@ -143,15 +170,30 @@ router.post('/matches/:id/lock', (req, res) => {
   res.redirect(req.get('Referer') || '/admin/matches');
 });
 
-// Lock / unlock entire round
+// Lock / unlock entire round (supports group_md1, group_md2, group_md3, and regular rounds)
 router.post('/matches/lock-round', (req, res) => {
   const db = getDb();
   const { round, action } = req.body;
   const locked = action === 'lock' ? 1 : 0;
-  const info = db.prepare('UPDATE matches SET is_locked = ? WHERE round = ?').run(locked, round);
-  logAction(db, req.session.user.id, action === 'lock' ? 'LOCK_ROUND' : 'UNLOCK_ROUND', `Round: ${round} (${info.changes} matches)`);
-  req.session.flashSuccess = `All ${round} matches ${action === 'lock' ? 'locked' : 'unlocked'}.`;
-  res.redirect('/admin/matches');
+  let info, label;
+
+  if (round === 'group_md1') {
+    info = db.prepare(`UPDATE matches SET is_locked=? WHERE round='group' AND match_time < ?`).run(locked, MD1_END);
+    label = 'Group MD1';
+  } else if (round === 'group_md2') {
+    info = db.prepare(`UPDATE matches SET is_locked=? WHERE round='group' AND match_time >= ? AND match_time < ?`).run(locked, MD1_END, MD2_END);
+    label = 'Group MD2';
+  } else if (round === 'group_md3') {
+    info = db.prepare(`UPDATE matches SET is_locked=? WHERE round='group' AND match_time >= ?`).run(locked, MD2_END);
+    label = 'Group MD3';
+  } else {
+    info = db.prepare('UPDATE matches SET is_locked=? WHERE round=?').run(locked, round);
+    label = round.toUpperCase();
+  }
+
+  logAction(db, req.session.user.id, action === 'lock' ? 'LOCK_ROUND' : 'UNLOCK_ROUND', `${label} (${info.changes} matches)`);
+  req.session.flashSuccess = `${label}: ${info.changes} matches ${action === 'lock' ? 'locked 🔒' : 'unlocked 🔓'}.`;
+  res.redirect('/admin');
 });
 
 // ════════════════════════════════════════════════════════════════════════════════
@@ -425,6 +467,139 @@ router.get('/log', (req, res) => {
     ORDER BY al.created_at DESC LIMIT 100
   `).all();
   res.render('admin/log', { title: 'Audit Log', logs });
+});
+
+// ════════════════════════════════════════════════════════════════════════════════
+// SYNC SCORES FROM ESPN
+// ════════════════════════════════════════════════════════════════════════════════
+
+// ESPN name → our DB flag name
+const TEAM_MAP = {
+  'Mexico': '🇲🇽 Mexico',
+  'Czech Republic': '🇨🇿 Czechia', 'Czechia': '🇨🇿 Czechia',
+  'South Korea': '🇰🇷 South Korea',
+  'South Africa': '🇿🇦 South Africa',
+  'Canada': '🇨🇦 Canada',
+  'Switzerland': '🇨🇭 Switzerland',
+  'Bosnia and Herzegovina': '🇧🇦 Bosnia & Herz.', 'Bosnia & Herzegovina': '🇧🇦 Bosnia & Herz.',
+  'Qatar': '🇶🇦 Qatar',
+  'Brazil': '🇧🇷 Brazil',
+  'Scotland': '🏴󠁧󠁢󠁳󠁣󠁴󠁿 Scotland',
+  'Morocco': '🇲🇦 Morocco',
+  'Haiti': '🇭🇹 Haiti',
+  'United States': '🇺🇸 USA', 'USA': '🇺🇸 USA',
+  'Australia': '🇦🇺 Australia',
+  'Turkey': '🇹🇷 Türkiye', 'Türkiye': '🇹🇷 Türkiye',
+  'Paraguay': '🇵🇾 Paraguay',
+  'Germany': '🇩🇪 Germany',
+  "Ivory Coast": '🇨🇮 Ivory Coast', "Côte d'Ivoire": '🇨🇮 Ivory Coast',
+  'Ecuador': '🇪🇨 Ecuador',
+  'Curacao': '🇨🇼 Curaçao', 'Curaçao': '🇨🇼 Curaçao',
+  'Netherlands': '🇳🇱 Netherlands',
+  'Sweden': '🇸🇪 Sweden',
+  'Japan': '🇯🇵 Japan',
+  'Tunisia': '🇹🇳 Tunisia',
+  'Belgium': '🇧🇪 Belgium',
+  'Iran': '🇮🇷 Iran',
+  'New Zealand': '🇳🇿 New Zealand',
+  'Egypt': '🇪🇬 Egypt',
+  'Spain': '🇪🇸 Spain',
+  'Saudi Arabia': '🇸🇦 Saudi Arabia',
+  'Uruguay': '🇺🇾 Uruguay',
+  'Cape Verde': '🇨🇻 Cape Verde',
+  'France': '🇫🇷 France',
+  'Norway': '🇳🇴 Norway',
+  'Senegal': '🇸🇳 Senegal',
+  'Iraq': '🇮🇶 Iraq',
+  'Argentina': '🇦🇷 Argentina',
+  'Austria': '🇦🇹 Austria',
+  'Jordan': '🇯🇴 Jordan',
+  'Algeria': '🇩🇿 Algeria',
+  'Portugal': '🇵🇹 Portugal',
+  'Colombia': '🇨🇴 Colombia',
+  'Uzbekistan': '🇺🇿 Uzbekistan',
+  'DR Congo': '🇨🇩 DR Congo', 'Congo': '🇨🇩 DR Congo', 'Democratic Republic of the Congo': '🇨🇩 DR Congo',
+  'England': '🏴󠁧󠁢󠁥󠁮󠁧󠁿 England',
+  'Croatia': '🇭🇷 Croatia',
+  'Ghana': '🇬🇭 Ghana',
+  'Panama': '🇵🇦 Panama',
+};
+
+router.post('/sync-scores', async (req, res) => {
+  const db = getDb();
+  const ESPN_URL = 'https://site.api.espn.com/apis/site/v2/sports/soccer/fifa.world/scoreboard?dates=20260611-20260719&limit=200';
+
+  let espnData;
+  try {
+    const resp = await fetch(ESPN_URL, { signal: AbortSignal.timeout(10000) });
+    espnData = await resp.json();
+  } catch (e) {
+    req.session.flashError = `ESPN fetch failed: ${e.message}`;
+    return res.redirect('/admin');
+  }
+
+  const upsertResult = db.prepare(`
+    INSERT INTO results (match_id, result, aet_result) VALUES (?, ?, ?)
+    ON CONFLICT (match_id) DO UPDATE SET result=excluded.result, aet_result=excluded.aet_result, entered_at=CURRENT_TIMESTAMP
+  `);
+
+  const events = espnData.events || [];
+  let synced = 0, skipped = 0;
+
+  for (const event of events) {
+    try {
+      const comp = event.competitions?.[0];
+      if (!comp) { skipped++; continue; }
+
+      const statusType = comp.status?.type;
+      if (!statusType?.completed) { skipped++; continue; }
+
+      const competitors = comp.competitors || [];
+      if (competitors.length !== 2) { skipped++; continue; }
+
+      const home = competitors.find(c => c.homeAway === 'home');
+      const away = competitors.find(c => c.homeAway === 'away');
+      if (!home || !away) { skipped++; continue; }
+
+      const map = n => TEAM_MAP[n];
+      const homeTeam = map(home.team?.displayName) || map(home.team?.name) || map(home.team?.shortDisplayName);
+      const awayTeam = map(away.team?.displayName) || map(away.team?.name) || map(away.team?.shortDisplayName);
+      if (!homeTeam || !awayTeam) { skipped++; continue; }
+
+      // Find match: try home=team_a/away=team_b first, then reversed
+      let match = db.prepare('SELECT * FROM matches WHERE team_a=? AND team_b=?').get(homeTeam, awayTeam);
+      let flipped = false;
+      if (!match) {
+        match = db.prepare('SELECT * FROM matches WHERE team_a=? AND team_b=?').get(awayTeam, homeTeam);
+        flipped = true;
+      }
+      if (!match) { skipped++; continue; }
+
+      const homeScore = parseInt(home.score ?? 0);
+      const awayScore = parseInt(away.score ?? 0);
+
+      // Determine winner from perspective of our DB's team_a / team_b
+      let result;
+      if (!flipped) {
+        result = homeScore > awayScore ? 'team_a' : homeScore < awayScore ? 'team_b' : 'draw';
+      } else {
+        result = awayScore > homeScore ? 'team_a' : awayScore < homeScore ? 'team_b' : 'draw';
+      }
+
+      // Detect AET/penalties from ESPN status detail
+      const detail = (statusType.detail || statusType.shortDetail || '').toLowerCase();
+      const isAET = /extra|aet|penalties|pen\b|pks/i.test(detail);
+      const aetResult = match.is_knockout ? (isAET ? 'aet' : '90min') : null;
+
+      upsertResult.run(match.id, result, aetResult);
+      db.prepare('UPDATE matches SET is_locked=1 WHERE id=?').run(match.id);
+      synced++;
+    } catch (_) { skipped++; }
+  }
+
+  logAction(db, req.session.user.id, 'SYNC_SCORES', `Synced ${synced} results, skipped ${skipped}`);
+  req.session.flashSuccess = `✅ Sync complete — ${synced} result(s) updated, ${skipped} skipped.`;
+  res.redirect('/admin');
 });
 
 // ════════════════════════════════════════════════════════════════════════════════

@@ -32,8 +32,7 @@
   text-overflow: ellipsis;
   display: block;
 }
-.predict-opt input[type="radio"]:checked + label,
-.predict-opt label.pre-selected {
+.predict-opt input[type="radio"]:checked + label {
   border-color: var(--accent);
   background: rgba(59,130,246,.15);
   color: var(--text);
@@ -63,19 +62,37 @@
   color: var(--gold);
 }
 .predict-aet label:hover { border-color: var(--gold); }
-.predict-save-btn {
-  width: 100%;
-  margin-top: 4px;
-  padding: 9px;
-  font-size: .88rem;
-}
 .saved-pred-row {
   display: flex;
   align-items: center;
   gap: 8px;
   flex-wrap: wrap;
 }
+/* ── Sticky save bar ────────────────────────────────────────────────────────── */
+#save-bar {
+  position: sticky;
+  top: 0;
+  z-index: 200;
+  background: var(--surface);
+  border-bottom: 2px solid var(--accent);
+  padding: 10px 16px;
+  display: none;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  box-shadow: 0 2px 12px rgba(0,0,0,.4);
+}
+#save-bar-info { font-size: .85rem; color: var(--text-dim); }
+#save-bar-info strong { color: var(--accent); }
 </style>
+
+<!-- Sticky batch save bar (hidden until pending predictions exist) -->
+<div id="save-bar">
+  <div id="save-bar-info">⚽ <strong id="save-bar-count">0</strong> unsaved prediction(s)</div>
+  <button id="save-bar-btn" onclick="saveAll()" class="btn btn-primary" style="padding:8px 20px">
+    💾 Save All
+  </button>
+</div>
 
 <div class="page">
   <div class="container">
@@ -117,9 +134,6 @@
         <p class="text-muted">No matches found for this filter.</p>
       </div>
     <% } else { %>
-
-    <!-- Build returnTo for inline forms -->
-    <% const returnTo = '/matches' + (filter.round ? '?round='+filter.round : (filter.group ? '?group='+filter.group : '')); %>
 
     <div class="matches-grid">
       <% matches.forEach(m => { %>
@@ -192,63 +206,72 @@
               <%/* ── Open for prediction ── */%>
               <div class="saved-pred-row">
                 <% if (m.prediction) { %>
-                  <span class="prediction-pill saved">
+                  <span class="prediction-pill saved" id="pill-<%= m.id %>">
                     <%= m.prediction === 'team_a' ? m.team_a : (m.prediction === 'draw' ? '🤝 Draw' : m.team_b) %>
                     <% if (m.aet_prediction) { %> · <%= m.aet_prediction === '90min' ? '90min' : 'AET' %><% } %>
                   </span>
+                  <% if (!user.is_admin) { %>
                   <button class="btn btn-secondary btn-sm" onclick="togglePredictForm('<%= m.id %>')">✏️ Edit</button>
+                  <% } %>
                 <% } else { %>
+                  <% if (!user.is_admin) { %>
                   <button class="btn btn-primary btn-sm" onclick="togglePredictForm('<%= m.id %>')">⚽ Predict</button>
+                  <% } %>
                 <% } %>
               </div>
             <% } %>
           </div>
         </div>
 
-        <%/* ── Inline prediction form (only for open matches) ── */%>
-        <% if (!m.result && !m.is_locked) { %>
+        <%/* ── Inline prediction form (only for open non-admin) ── */%>
+        <% if (!m.result && !m.is_locked && !user.is_admin) { %>
         <div id="predict-form-<%= m.id %>" class="predict-form" style="display:none">
-          <form method="POST" action="/matches/<%= m.id %>/predict">
-            <input type="hidden" name="_returnTo" value="<%= returnTo %>">
 
-            <div class="predict-opts">
-              <div class="predict-opt">
-                <input type="radio" id="pa_<%= m.id %>" name="prediction" value="team_a"
-                       <%= m.prediction === 'team_a' ? 'checked' : '' %> required>
-                <label for="pa_<%= m.id %>" title="<%= m.team_a %>"><%= m.team_a %></label>
-              </div>
-              <% if (!m.is_knockout) { %>
-              <div class="predict-opt">
-                <input type="radio" id="pd_<%= m.id %>" name="prediction" value="draw"
-                       <%= m.prediction === 'draw' ? 'checked' : '' %>>
-                <label for="pd_<%= m.id %>">🤝 Draw</label>
-              </div>
-              <% } %>
-              <div class="predict-opt">
-                <input type="radio" id="pb_<%= m.id %>" name="prediction" value="team_b"
-                       <%= m.prediction === 'team_b' ? 'checked' : '' %>>
-                <label for="pb_<%= m.id %>" title="<%= m.team_b %>"><%= m.team_b %></label>
-              </div>
+          <div class="predict-opts">
+            <div class="predict-opt">
+              <input type="radio" id="pa_<%= m.id %>" name="pred_<%= m.id %>" value="team_a"
+                     <%= m.prediction === 'team_a' ? 'checked' : '' %>
+                     onchange="setPending(<%= m.id %>, <%= m.is_knockout ? 'true' : 'false' %>)">
+              <label for="pa_<%= m.id %>" title="<%= m.team_a %>"><%= m.team_a %></label>
             </div>
-
-            <% if (m.is_knockout) { %>
-            <div class="predict-aet">
-              <span>Decided in:</span>
-              <div>
-                <input type="radio" id="a90_<%= m.id %>" name="aet_prediction" value="90min"
-                       <%= m.aet_prediction === '90min' ? 'checked' : '' %> required>
-                <label for="a90_<%= m.id %>">90 min</label>
-              </div>
-              <div>
-                <input type="radio" id="aet_<%= m.id %>" name="aet_prediction" value="aet"
-                       <%= m.aet_prediction === 'aet' ? 'checked' : '' %>>
-                <label for="aet_<%= m.id %>">AET / Pens</label>
-              </div>
+            <% if (!m.is_knockout) { %>
+            <div class="predict-opt">
+              <input type="radio" id="pd_<%= m.id %>" name="pred_<%= m.id %>" value="draw"
+                     <%= m.prediction === 'draw' ? 'checked' : '' %>
+                     onchange="setPending(<%= m.id %>, false)">
+              <label for="pd_<%= m.id %>">🤝 Draw</label>
             </div>
             <% } %>
+            <div class="predict-opt">
+              <input type="radio" id="pb_<%= m.id %>" name="pred_<%= m.id %>" value="team_b"
+                     <%= m.prediction === 'team_b' ? 'checked' : '' %>
+                     onchange="setPending(<%= m.id %>, <%= m.is_knockout ? 'true' : 'false' %>)">
+              <label for="pb_<%= m.id %>" title="<%= m.team_b %>"><%= m.team_b %></label>
+            </div>
+          </div>
 
-            <button type="submit" class="btn btn-primary predict-save-btn">💾 Save Prediction</button>
-          </form>
+          <% if (m.is_knockout) { %>
+          <div class="predict-aet">
+            <span>Decided in:</span>
+            <div>
+              <input type="radio" id="a90_<%= m.id %>" name="aet_<%= m.id %>" value="90min"
+                     <%= m.aet_prediction === '90min' ? 'checked' : '' %>
+                     onchange="setPending(<%= m.id %>, true)">
+              <label for="a90_<%= m.id %>">90 min</label>
+            </div>
+            <div>
+              <input type="radio" id="aet_<%= m.id %>" name="aet_<%= m.id %>" value="aet"
+                     <%= m.aet_prediction === 'aet' ? 'checked' : '' %>
+                     onchange="setPending(<%= m.id %>, true)">
+              <label for="aet_<%= m.id %>">AET / Pens</label>
+            </div>
+          </div>
+          <% } %>
+
+          <div style="font-size:.75rem;color:var(--text-dim);margin-top:6px;text-align:center">
+            Selections auto-tracked · hit <strong style="color:var(--accent)">Save All</strong> at the top when ready
+          </div>
+
         </div>
         <% } %>
 
@@ -259,14 +282,83 @@
   </div>
 </div>
 
+<!-- Seed saved predictions from server for change-detection -->
 <script>
+const savedPredictions = {
+  <% matches.forEach(m => { if (m.prediction) { %>
+  <%= m.id %>: { prediction: '<%= m.prediction %>', aet_prediction: <%= m.aet_prediction ? `'${m.aet_prediction}'` : 'null' %> },
+  <% } }) %>
+};
+
+const pending = {};
+
+function setPending(matchId, isKnockout) {
+  const predEl = document.querySelector(`input[name="pred_${matchId}"]:checked`);
+  if (!predEl) return;
+  const pred = predEl.value;
+  let aet = null;
+  if (isKnockout) {
+    const aetEl = document.querySelector(`input[name="aet_${matchId}"]:checked`);
+    aet = aetEl ? aetEl.value : null;
+  }
+  const saved = savedPredictions[matchId];
+  const unchanged = saved && saved.prediction === pred && saved.aet_prediction === aet;
+  if (unchanged) {
+    delete pending[matchId];
+  } else {
+    pending[matchId] = { prediction: pred, aet_prediction: aet };
+  }
+  updateSaveBar();
+}
+
+function updateSaveBar() {
+  const count = Object.keys(pending).length;
+  const bar = document.getElementById('save-bar');
+  const btn = document.getElementById('save-bar-btn');
+  const countEl = document.getElementById('save-bar-count');
+  countEl.textContent = count;
+  bar.style.display = count > 0 ? 'flex' : 'none';
+  if (btn) btn.textContent = `💾 Save All (${count})`;
+}
+
+async function saveAll() {
+  const btn = document.getElementById('save-bar-btn');
+  btn.disabled = true;
+  btn.textContent = 'Saving…';
+
+  const predictions = Object.entries(pending).map(([matchId, data]) => ({
+    matchId: parseInt(matchId),
+    prediction: data.prediction,
+    aet_prediction: data.aet_prediction
+  }));
+
+  try {
+    const resp = await fetch('/matches/predict-batch', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ predictions })
+    });
+    const data = await resp.json();
+    if (data.ok) {
+      window.location.reload();
+    } else {
+      const msg = data.errors && data.errors.length ? data.errors.join('\n') : 'Unknown error';
+      alert('⚠️ Could not save some predictions:\n' + msg);
+      btn.disabled = false;
+      updateSaveBar();
+    }
+  } catch (e) {
+    alert('Save failed — please try again.');
+    btn.disabled = false;
+    updateSaveBar();
+  }
+}
+
 function togglePredictForm(id) {
   const form = document.getElementById('predict-form-' + id);
   if (!form) return;
   const isOpen = form.style.display !== 'none';
-  // Close all others
   document.querySelectorAll('.predict-form').forEach(f => f.style.display = 'none');
-  // Toggle this one
   if (!isOpen) {
     form.style.display = 'block';
     form.scrollIntoView({ behavior: 'smooth', block: 'nearest' });

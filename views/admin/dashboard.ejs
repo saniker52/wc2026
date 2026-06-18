@@ -102,22 +102,74 @@
       </div>
     </div>
 
-    <!-- Quick lock by round -->
-    <div class="card">
-      <div class="card-title">🔒 Quick Lock / Unlock by Round</div>
-      <form method="POST" action="/admin/matches/lock-round" style="display:flex;gap:10px;align-items:center;flex-wrap:wrap">
-        <select name="round" class="form-control" style="max-width:180px">
-          <option value="group">Group Stage (all)</option>
-          <option value="r32">Round of 32</option>
-          <option value="r16">Round of 16</option>
-          <option value="qf">Quarterfinals</option>
-          <option value="sf">Semifinals</option>
-          <option value="3rd">Third Place</option>
-          <option value="final">Final</option>
-        </select>
-        <button type="submit" name="action" value="lock" class="btn btn-danger">🔒 Lock All</button>
-        <button type="submit" name="action" value="unlock" class="btn btn-success">🔓 Unlock All</button>
-      </form>
+    <!-- Lock / Unlock by Round + Matchday -->
+    <div class="card" style="margin-bottom:20px">
+      <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px;margin-bottom:16px">
+        <div class="card-title" style="margin:0">🔒 Lock / Unlock Predictions</div>
+        <!-- Sync Scores button -->
+        <form method="POST" action="/admin/sync-scores" onsubmit="this.querySelector('button').textContent='Syncing…';this.querySelector('button').disabled=true">
+          <button type="submit" class="btn btn-primary" style="background:#059669;border-color:#059669">
+            🔄 Sync Scores from ESPN
+          </button>
+        </form>
+      </div>
+
+      <table style="width:100%;border-collapse:collapse;font-size:.85rem">
+        <thead>
+          <tr style="background:rgba(255,255,255,.04);color:var(--text-dim);font-size:.72rem;text-transform:uppercase;letter-spacing:.04em">
+            <th style="padding:8px 12px;text-align:left">Round / Matchday</th>
+            <th style="padding:8px 12px;text-align:center">Status</th>
+            <th style="padding:8px 12px;text-align:right">Actions</th>
+          </tr>
+        </thead>
+        <tbody>
+          <%
+            const rounds = [
+              { key: 'group_md1', label: '⚽ Group Stage — Matchday 1', sub: 'Jun 11–17' },
+              { key: 'group_md2', label: '⚽ Group Stage — Matchday 2', sub: 'Jun 18–23' },
+              { key: 'group_md3', label: '⚽ Group Stage — Matchday 3', sub: 'Jun 24+' },
+              { key: 'r32',   label: '🏆 Round of 32',    sub: '' },
+              { key: 'r16',   label: '🏆 Round of 16',    sub: '' },
+              { key: 'qf',    label: '🏆 Quarterfinals',  sub: '' },
+              { key: 'sf',    label: '🏆 Semifinals',     sub: '' },
+              { key: '3rd',   label: '🏆 Third Place',    sub: '' },
+              { key: 'final', label: '🏆 Final',          sub: '' },
+            ];
+          %>
+          <% rounds.forEach((r, i) => {
+            const ls = lockStatus[r.key] || { total: 0, locked: 0 };
+            const allLocked = ls.total > 0 && ls.locked === ls.total;
+            const noneLocked = ls.locked === 0;
+          %>
+          <tr style="border-top:1px solid var(--border)<%= i%2===1 ? ';background:rgba(255,255,255,.015)' : '' %>">
+            <td style="padding:10px 12px">
+              <div style="font-weight:600;color:var(--text)"><%= r.label %></div>
+              <% if (r.sub) { %><div style="font-size:.72rem;color:var(--text-dim)"><%= r.sub %></div><% } %>
+            </td>
+            <td style="padding:10px 12px;text-align:center">
+              <% if (ls.total === 0) { %>
+                <span style="font-size:.78rem;color:var(--muted)">—</span>
+              <% } else if (allLocked) { %>
+                <span style="font-size:.78rem;color:#f87171;font-weight:600">🔒 All locked (<%= ls.total %>)</span>
+              <% } else if (noneLocked) { %>
+                <span style="font-size:.78rem;color:var(--green);font-weight:600">🔓 Open (<%= ls.total %>)</span>
+              <% } else { %>
+                <span style="font-size:.78rem;color:var(--gold)"><%= ls.locked %>/<%= ls.total %> locked</span>
+              <% } %>
+            </td>
+            <td style="padding:10px 12px;text-align:right">
+              <% if (ls.total > 0) { %>
+              <form method="POST" action="/admin/matches/lock-round" style="display:inline-flex;gap:6px">
+                <input type="hidden" name="round" value="<%= r.key %>">
+                <button type="submit" name="action" value="lock" class="btn btn-danger btn-sm">🔒 Lock</button>
+                <button type="submit" name="action" value="unlock" class="btn btn-success btn-sm">🔓 Unlock</button>
+              </form>
+              <% } %>
+            </td>
+          </tr>
+          <% }) %>
+        </tbody>
+      </table>
     </div>
 
   </div>

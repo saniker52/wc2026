@@ -151,8 +151,55 @@ router.get('/matches/:id', requireLogin, (req, res) => {
   });
 });
 
+// ── Batch prediction ──────────────────────────────────────────────────────────
+router.post('/matches/predict-batch', requireLogin, (req, res) => {
+  if (req.session.user.is_admin) return res.json({ ok: false, errors: ['Admin cannot predict'] });
+
+  const db = getDb();
+  const userId = req.session.user.id;
+  const { predictions } = req.body;
+
+  if (!Array.isArray(predictions) || predictions.length === 0) {
+    return res.json({ ok: false, errors: ['No predictions provided'] });
+  }
+
+  const savePred = db.prepare(`
+    INSERT INTO predictions (user_id, match_id, prediction, aet_prediction, updated_at)
+    VALUES (?, ?, ?, ?, CURRENT_TIMESTAMP)
+    ON CONFLICT (user_id, match_id) DO UPDATE SET
+      prediction = excluded.prediction,
+      aet_prediction = excluded.aet_prediction,
+      updated_at = CURRENT_TIMESTAMP
+  `);
+
+  const saved = [];
+  const errors = [];
+
+  for (const p of predictions) {
+    const { matchId, prediction, aet_prediction } = p;
+    if (!matchId || !prediction) { errors.push(`Missing data for match ${matchId}`); continue; }
+    const match = db.prepare('SELECT * FROM matches WHERE id = ?').get(matchId);
+    if (!match) { errors.push(`Match ${matchId} not found`); continue; }
+    if (match.is_locked) { errors.push(`Match ${matchId} locked`); continue; }
+    if (db.prepare('SELECT id FROM results WHERE match_id = ?').get(matchId)) {
+      errors.push(`Match ${matchId} already has result`); continue;
+    }
+    const validPreds = ['team_a', 'draw', 'team_b'];
+    if (!validPreds.includes(prediction)) { errors.push(`Invalid prediction for ${matchId}`); continue; }
+    if (match.is_knockout && prediction === 'draw') { errors.push(`No draw in knockout (${matchId})`); continue; }
+    if (match.is_knockout && !['90min', 'aet'].includes(aet_prediction)) {
+      errors.push(`AET required for knockout match ${matchId}`); continue;
+    }
+    savePred.run(userId, matchId, prediction, match.is_knockout ? aet_prediction : null);
+    saved.push(matchId);
+  }
+
+  res.json({ ok: true, saved, errors });
+});
+
 // ── Submit / update prediction ────────────────────────────────────────────────
 router.post('/matches/:id/predict', requireLogin, (req, res) => {
+  if (req.session.user.is_admin) return res.redirect(req.body._returnTo || '/matches');
   const db = getDb();
   const userId = req.session.user.id;
   const matchId = parseInt(req.params.id);
