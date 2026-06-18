@@ -49,15 +49,6 @@ router.get('/dashboard', requireLogin, (req, res) => {
     totalPts += pts.main + pts.bonus;
   });
 
-  // Award points
-  const awardPts = db.prepare(`
-    SELECT COALESCE(SUM(ac.points), 0) as pts
-    FROM award_predictions ap
-    JOIN award_categories ac ON ap.category_id = ac.id
-    WHERE ap.user_id = ? AND ac.winner_option_id = ap.option_id
-  `).get(userId).pts;
-  totalPts += awardPts;
-
   // Rank + full leaderboard for dashboard
   const { computeLeaderboard } = require('../db/database');
   const lb = computeLeaderboard(db);
@@ -71,7 +62,7 @@ router.get('/dashboard', requireLogin, (req, res) => {
       const pts = calculateMatchPoints(m, { result: m.result, aet_result: m.aet_result }, m);
       return { ...m, match_time_kwt: toKuwaitTimeShort(m.match_time), pts };
     }),
-    stats: { totalPts, groupPts, knockoutPts, bonusPts, awardPts, correct, rank: myRank, totalUsers },
+    stats: { totalPts, groupPts, knockoutPts, bonusPts, correct, rank: myRank, totalUsers },
     leaderboard: lb
   });
 });

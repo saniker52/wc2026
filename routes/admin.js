@@ -403,60 +403,6 @@ router.post('/users/:id/points-override', (req, res) => {
 });
 
 // ════════════════════════════════════════════════════════════════════════════════
-// AWARD MANAGEMENT
-// ════════════════════════════════════════════════════════════════════════════════
-
-router.get('/awards', (req, res) => {
-  const db = getDb();
-  const categories = db.prepare('SELECT * FROM award_categories ORDER BY sort_order').all();
-  const enriched = categories.map(cat => {
-    const options = db.prepare('SELECT * FROM award_options WHERE category_id = ? ORDER BY name').all(cat.id);
-    const winner = cat.winner_option_id ? db.prepare('SELECT * FROM award_options WHERE id = ?').get(cat.winner_option_id) : null;
-    return { ...cat, options, winner };
-  });
-  res.render('admin/awards', { title: 'Manage Award Predictions', categories: enriched });
-});
-
-// Add option to category
-router.post('/awards/:catId/options', (req, res) => {
-  const db = getDb();
-  const { name } = req.body;
-  if (!name) { req.session.flashError = 'Name required.'; return res.redirect('/admin/awards'); }
-  db.prepare('INSERT INTO award_options (category_id, name) VALUES (?, ?)').run(req.params.catId, name.trim());
-  req.session.flashSuccess = 'Option added.';
-  res.redirect('/admin/awards');
-});
-
-// Delete option
-router.post('/awards/options/:id/delete', (req, res) => {
-  const db = getDb();
-  db.prepare('DELETE FROM award_options WHERE id = ?').run(req.params.id);
-  req.session.flashSuccess = 'Option deleted.';
-  res.redirect('/admin/awards');
-});
-
-// Lock / unlock category
-router.post('/awards/:catId/lock', (req, res) => {
-  const db = getDb();
-  const { action } = req.body;
-  db.prepare('UPDATE award_categories SET is_locked = ? WHERE id = ?').run(action === 'lock' ? 1 : 0, req.params.catId);
-  req.session.flashSuccess = `Category ${action === 'lock' ? 'locked' : 'unlocked'}.`;
-  res.redirect('/admin/awards');
-});
-
-// Set winner
-router.post('/awards/:catId/winner', (req, res) => {
-  const db = getDb();
-  const { winner_option_id } = req.body;
-  const cat = db.prepare('SELECT * FROM award_categories WHERE id = ?').get(req.params.catId);
-  if (!cat) { req.session.flashError = 'Category not found.'; return res.redirect('/admin/awards'); }
-  db.prepare('UPDATE award_categories SET winner_option_id = ? WHERE id = ?').run(winner_option_id || null, req.params.catId);
-  logAction(db, req.session.user.id, 'SET_AWARD_WINNER', `Category: ${cat.name}, Option #${winner_option_id}`);
-  req.session.flashSuccess = 'Winner set. Points will be auto-calculated on the leaderboard.';
-  res.redirect('/admin/awards');
-});
-
-// ════════════════════════════════════════════════════════════════════════════════
 // AUDIT LOG
 // ════════════════════════════════════════════════════════════════════════════════
 
@@ -614,8 +560,8 @@ router.get('/export/leaderboard', (req, res) => {
   const db = getDb();
   const lb = computeLeaderboard(db);
   const csv = [
-    'Rank,Username,Display Name,Total,Group,Knockout,Bonus,Awards,Correct',
-    ...lb.map(r => `${r.rank},"${r.username}","${r.display_name}",${r.total},${r.group_pts},${r.knockout_pts},${r.bonus_pts},${r.award_pts},${r.correct}`)
+    'Rank,Username,Display Name,Total,Group,Knockout,Bonus,Correct',
+    ...lb.map(r => `${r.rank},"${r.username}","${r.display_name}",${r.total},${r.group_pts},${r.knockout_pts},${r.bonus_pts},${r.correct}`)
   ].join('\n');
 
   res.setHeader('Content-Type', 'text/csv');

@@ -46,7 +46,6 @@ app.use((req, res, next) => {
 app.use('/', require('./routes/auth'));
 app.use('/', require('./routes/user'));
 app.use('/leaderboard', require('./routes/leaderboard'));
-app.use('/awards', require('./routes/awards'));
 app.use('/admin', require('./routes/admin'));
 
 // ── Root redirect ─────────────────────────────────────────────────────────────

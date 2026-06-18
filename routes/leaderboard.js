@@ -19,10 +19,6 @@ router.get('/', requireLogin, (req, res) => {
     rows = all.map(r => ({ ...r, display_total: r.knockout_pts + r.bonus_pts }))
       .sort((a, b) => (b.knockout_pts + b.bonus_pts) - (a.knockout_pts + a.bonus_pts))
       .map((r, i) => ({ ...r, rank: i + 1 }));
-  } else if (filter === 'awards') {
-    rows = all.map(r => ({ ...r, display_total: r.award_pts }))
-      .sort((a, b) => b.award_pts - a.award_pts)
-      .map((r, i) => ({ ...r, rank: i + 1 }));
   } else {
     rows = all.map(r => ({ ...r, display_total: r.total }));
   }

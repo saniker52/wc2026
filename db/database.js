@@ -72,37 +72,6 @@ function initSchema() {
       FOREIGN KEY (match_id) REFERENCES matches(id) ON DELETE CASCADE
     );
 
-    -- ── Award Categories ───────────────────────────────────────────────────────
-    CREATE TABLE IF NOT EXISTS award_categories (
-      id             INTEGER PRIMARY KEY AUTOINCREMENT,
-      name           TEXT NOT NULL,
-      points         INTEGER DEFAULT 10,
-      is_locked      INTEGER DEFAULT 0,
-      winner_option_id INTEGER,
-      sort_order     INTEGER DEFAULT 0
-    );
-
-    -- ── Award Options ──────────────────────────────────────────────────────────
-    CREATE TABLE IF NOT EXISTS award_options (
-      id          INTEGER PRIMARY KEY AUTOINCREMENT,
-      category_id INTEGER NOT NULL,
-      name        TEXT NOT NULL,
-      FOREIGN KEY (category_id) REFERENCES award_categories(id) ON DELETE CASCADE
-    );
-
-    -- ── Award Predictions ──────────────────────────────────────────────────────
-    CREATE TABLE IF NOT EXISTS award_predictions (
-      id          INTEGER PRIMARY KEY AUTOINCREMENT,
-      user_id     INTEGER NOT NULL,
-      category_id INTEGER NOT NULL,
-      option_id   INTEGER NOT NULL,
-      submitted_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-      UNIQUE (user_id, category_id),
-      FOREIGN KEY (user_id)     REFERENCES users(id)            ON DELETE CASCADE,
-      FOREIGN KEY (category_id) REFERENCES award_categories(id) ON DELETE CASCADE,
-      FOREIGN KEY (option_id)   REFERENCES award_options(id)    ON DELETE CASCADE
-    );
-
     -- ── Admin Activity Log ─────────────────────────────────────────────────────
     CREATE TABLE IF NOT EXISTS admin_log (
       id         INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -117,8 +86,6 @@ function initSchema() {
     CREATE INDEX IF NOT EXISTS idx_predictions_user    ON predictions(user_id);
     CREATE INDEX IF NOT EXISTS idx_predictions_match   ON predictions(match_id);
     CREATE INDEX IF NOT EXISTS idx_matches_round       ON matches(round);
-    CREATE INDEX IF NOT EXISTS idx_award_options_cat   ON award_options(category_id);
-    CREATE INDEX IF NOT EXISTS idx_award_pred_user     ON award_predictions(user_id);
   `);
 
   seedInitialData();
@@ -138,23 +105,6 @@ function seedInitialData() {
       'INSERT INTO users (username, display_name, password_hash, is_admin) VALUES (?, ?, ?, 1)'
     ).run('admin', 'Administrator', hash);
     console.log('✅ Admin user created: admin / admin123');
-  }
-
-  // ── Award categories ───────────────────────────────────────────────────────
-  const awardsExist = db.prepare('SELECT id FROM award_categories LIMIT 1').get();
-  if (!awardsExist) {
-    const insertCat = db.prepare(
-      'INSERT INTO award_categories (name, points, sort_order) VALUES (?, 10, ?)'
-    );
-    const categories = [
-      'Top Goalscorer (Golden Boot)',
-      'Best Player (Golden Ball)',
-      'Best Young Player',
-      'Best Goalkeeper (Golden Glove)',
-      'Tournament Winner'
-    ];
-    categories.forEach((name, i) => insertCat.run(name, i));
-    console.log('✅ Award categories seeded');
   }
 
   // ── Non-destructive schema additions ──────────────────────────────────────
@@ -370,8 +320,6 @@ function computeLeaderboard(dbInstance) {
   const matches = dbInstance.prepare('SELECT * FROM matches').all();
   const results = dbInstance.prepare('SELECT * FROM results').all();
   const predictions = dbInstance.prepare('SELECT * FROM predictions').all();
-  const awardPredictions = dbInstance.prepare('SELECT ap.*, ac.points, ac.winner_option_id FROM award_predictions ap JOIN award_categories ac ON ap.category_id = ac.id').all();
-
   const resultMap = {};
   results.forEach(r => { resultMap[r.match_id] = r; });
 
@@ -384,14 +332,8 @@ function computeLeaderboard(dbInstance) {
     predMap[p.user_id][p.match_id] = p;
   });
 
-  const awardMap = {};
-  awardPredictions.forEach(ap => {
-    if (!awardMap[ap.user_id]) awardMap[ap.user_id] = [];
-    awardMap[ap.user_id].push(ap);
-  });
-
   const rows = users.map(u => {
-    let groupPts = 0, knockoutPts = 0, bonusPts = 0, awardPts = 0, correct = 0;
+    let groupPts = 0, knockoutPts = 0, bonusPts = 0, correct = 0;
     const userPreds = predMap[u.id] || {};
 
     matches.forEach(m => {
@@ -410,14 +352,6 @@ function computeLeaderboard(dbInstance) {
       }
     });
 
-    // Award points
-    const userAwards = awardMap[u.id] || [];
-    userAwards.forEach(ap => {
-      if (ap.winner_option_id && ap.option_id === ap.winner_option_id) {
-        awardPts += ap.points;
-      }
-    });
-
     return {
       id: u.id,
       username: u.username,
@@ -425,8 +359,7 @@ function computeLeaderboard(dbInstance) {
       group_pts: groupPts,
       knockout_pts: knockoutPts,
       bonus_pts: bonusPts,
-      award_pts: awardPts,
-      total: groupPts + knockoutPts + bonusPts + awardPts,
+      total: groupPts + knockoutPts + bonusPts,
       correct
     };
   });
