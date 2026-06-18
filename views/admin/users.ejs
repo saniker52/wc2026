@@ -1,0 +1,120 @@
+<%- include('../partials/header', { currentPage: '' }) %>
+<%- include('../partials/admin-nav', { adminPage: 'users' }) %>
+
+<div class="page">
+  <div class="container">
+
+    <% if (flashSuccess) { %><div class="flash flash-success">✅ <%- flashSuccess %></div><% } %>
+    <% if (flashError)   { %><div class="flash flash-error">⚠️ <%- flashError %></div><% } %>
+
+    <div class="section-header">
+      <div class="section-title">👥 User Management</div>
+      <button class="btn btn-primary" onclick="document.getElementById('addUserForm').classList.toggle('hidden')">+ Add User</button>
+    </div>
+
+    <!-- Add user form (hidden by default) -->
+    <div id="addUserForm" class="card hidden mb-16">
+      <div class="card-title">➕ Add New User</div>
+      <form method="POST" action="/admin/users">
+        <div class="form-row cols-2">
+          <div class="form-group">
+            <label class="form-label">Username *</label>
+            <input type="text" name="username" class="form-control" required placeholder="e.g. john">
+          </div>
+          <div class="form-group">
+            <label class="form-label">Display Name</label>
+            <input type="text" name="display_name" class="form-control" placeholder="e.g. John Smith">
+          </div>
+        </div>
+        <div class="form-row cols-2">
+          <div class="form-group">
+            <label class="form-label">Password *</label>
+            <input type="password" name="password" class="form-control" required placeholder="Min 6 chars">
+          </div>
+          <div class="form-group" style="display:flex;align-items:center;gap:10px;margin-top:24px">
+            <input type="checkbox" name="is_admin" id="isAdmin" value="1">
+            <label for="isAdmin" class="form-label" style="margin:0">Admin account</label>
+          </div>
+        </div>
+        <button type="submit" class="btn btn-primary">Create User</button>
+      </form>
+    </div>
+
+    <!-- Users table -->
+    <div class="card" style="padding:0;overflow:hidden">
+      <table class="admin-table">
+        <thead>
+          <tr>
+            <th>Username</th>
+            <th>Display Name</th>
+            <th>Role</th>
+            <th>Rank</th>
+            <th>Total Pts</th>
+            <th>Correct</th>
+            <th>Actions</th>
+          </tr>
+        </thead>
+        <tbody>
+          <% users.forEach(u => { %>
+          <tr>
+            <td><strong><%= u.username %></strong></td>
+            <td><%= u.display_name || '—' %></td>
+            <td>
+              <% if (u.is_admin) { %>
+                <span class="admin-badge">Admin</span>
+              <% } else { %>
+                <span style="color:var(--text-dim);font-size:.82rem">Player</span>
+              <% } %>
+            </td>
+            <td><%= u.stats ? u.stats.rank : '—' %></td>
+            <td style="font-weight:700;color:var(--gold)"><%= u.stats ? u.stats.total : 0 %></td>
+            <td><%= u.stats ? u.stats.correct : 0 %></td>
+            <td style="white-space:nowrap">
+              <a href="/admin/users/<%= u.id %>/predictions" class="btn btn-sm btn-secondary">Predictions</a>
+
+              <button class="btn btn-sm btn-secondary"
+                      onclick="openResetModal(<%= u.id %>, '<%= u.username %>')">
+                🔑 Reset PW
+              </button>
+
+              <% if (u.id !== user.id) { %>
+              <form method="POST" action="/admin/users/<%= u.id %>/delete" style="display:inline"
+                    onsubmit="return confirm('Delete user <%= u.username %> and all their predictions?')">
+                <button class="btn btn-sm btn-danger">✕</button>
+              </form>
+              <% } %>
+            </td>
+          </tr>
+          <% }) %>
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+<!-- Reset password modal -->
+<div id="resetModal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.7);z-index:200;align-items:center;justify-content:center">
+  <div style="background:var(--surface);border:1px solid var(--border);border-radius:14px;padding:28px;width:100%;max-width:380px;margin:16px">
+    <h3 style="margin-bottom:16px;font-size:1rem" id="resetTitle">Reset Password</h3>
+    <form method="POST" id="resetForm">
+      <div class="form-group">
+        <label class="form-label">New Password</label>
+        <input type="password" name="new_password" class="form-control" required placeholder="Min 6 characters" autocomplete="new-password">
+      </div>
+      <div style="display:flex;gap:10px;margin-top:16px">
+        <button type="submit" class="btn btn-primary" style="flex:1">Reset</button>
+        <button type="button" class="btn btn-secondary" onclick="document.getElementById('resetModal').style.display='none'">Cancel</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<script>
+function openResetModal(uid, username) {
+  document.getElementById('resetTitle').textContent = 'Reset password for ' + username;
+  document.getElementById('resetForm').action = '/admin/users/' + uid + '/reset-password';
+  document.getElementById('resetModal').style.display = 'flex';
+}
+</script>
+
+<%- include('../partials/footer') %>

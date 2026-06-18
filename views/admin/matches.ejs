@@ -1,0 +1,96 @@
+<%- include('../partials/header', { currentPage: '' }) %>
+<%- include('../partials/admin-nav', { adminPage: 'matches' }) %>
+
+<div class="page">
+  <div class="container">
+
+    <% if (flashSuccess) { %><div class="flash flash-success">✅ <%- flashSuccess %></div><% } %>
+    <% if (flashError)   { %><div class="flash flash-error">⚠️ <%- flashError %></div><% } %>
+
+    <div class="section-header">
+      <div class="section-title">⚽ Match Management</div>
+      <a href="/admin/matches/new" class="btn btn-primary">+ Add Match</a>
+    </div>
+
+    <!-- Round filter -->
+    <div class="tabs mb-16">
+      <a href="/admin/matches" class="tab-btn <%= filter === 'all' ? 'active' : '' %>">All</a>
+      <a href="/admin/matches?round=group" class="tab-btn <%= filter === 'group' ? 'active' : '' %>">Group</a>
+      <a href="/admin/matches?round=r32"   class="tab-btn <%= filter === 'r32'   ? 'active' : '' %>">R32</a>
+      <a href="/admin/matches?round=r16"   class="tab-btn <%= filter === 'r16'   ? 'active' : '' %>">R16</a>
+      <a href="/admin/matches?round=qf"    class="tab-btn <%= filter === 'qf'    ? 'active' : '' %>">QF</a>
+      <a href="/admin/matches?round=sf"    class="tab-btn <%= filter === 'sf'    ? 'active' : '' %>">SF</a>
+      <a href="/admin/matches?round=3rd"   class="tab-btn <%= filter === '3rd'   ? 'active' : '' %>">3rd</a>
+      <a href="/admin/matches?round=final" class="tab-btn <%= filter === 'final' ? 'active' : '' %>">Final</a>
+    </div>
+
+    <div class="card" style="padding:0;overflow:hidden">
+      <table class="admin-table">
+        <thead>
+          <tr>
+            <th>#</th>
+            <th>Match</th>
+            <th>Round</th>
+            <th>Kickoff (KWT)</th>
+            <th>Status</th>
+            <th>Result</th>
+            <th>Actions</th>
+          </tr>
+        </thead>
+        <tbody>
+          <% matches.forEach(m => { %>
+          <tr>
+            <td style="color:var(--muted);font-size:.8rem"><%= m.id %></td>
+            <td>
+              <strong><%= m.team_a %></strong>
+              <span style="color:var(--muted)"> vs </span>
+              <strong><%= m.team_b %></strong>
+              <% if (m.city && m.city !== 'TBC') { %>
+                <div style="font-size:.72rem;color:var(--muted)"><%= m.city %></div>
+              <% } %>
+            </td>
+            <td>
+              <span class="badge badge-<%= m.round === 'group' ? 'group' : 'knockout' %>">
+                <%= m.round === 'group' ? 'Group ' + (m.group_name || '') : m.round.toUpperCase() %>
+              </span>
+            </td>
+            <td style="font-size:.8rem;color:var(--text-dim);white-space:nowrap"><%= m.match_time_kwt %></td>
+            <td>
+              <% if (m.is_locked) { %>
+                <span class="badge badge-locked">🔒 Locked</span>
+              <% } else { %>
+                <span class="badge badge-open">🟢 Open</span>
+              <% } %>
+            </td>
+            <td style="font-size:.82rem">
+              <% if (m.result) { %>
+                <span class="result-<%= m.result %>">
+                  <%= m.result === 'team_a' ? m.team_a : (m.result === 'draw' ? 'Draw' : m.team_b) %>
+                </span>
+              <% } else { %><span class="text-muted">—</span><% } %>
+            </td>
+            <td style="white-space:nowrap">
+              <a href="/admin/matches/<%= m.id %>/edit" class="btn btn-sm btn-secondary">Edit</a>
+
+              <form method="POST" action="/admin/matches/<%= m.id %>/lock" style="display:inline">
+                <% if (m.is_locked) { %>
+                  <button name="action" value="unlock" class="btn btn-sm btn-success">🔓</button>
+                <% } else { %>
+                  <button name="action" value="lock" class="btn btn-sm btn-danger">🔒</button>
+                <% } %>
+              </form>
+
+              <form method="POST" action="/admin/matches/<%= m.id %>/delete" style="display:inline"
+                    onsubmit="return confirm('Delete this match and all its predictions?')">
+                <button class="btn btn-sm btn-danger">✕</button>
+              </form>
+            </td>
+          </tr>
+          <% }) %>
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+<%- include('../partials/footer') %>

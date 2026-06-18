@@ -1,0 +1,146 @@
+<%- include('../partials/header', { currentPage: '' }) %>
+<%- include('../partials/admin-nav', { adminPage: 'users' }) %>
+
+<div class="page">
+  <div class="container">
+
+    <% if (flashSuccess) { %><div class="flash flash-success">✅ <%- flashSuccess %></div><% } %>
+    <% if (flashError)   { %><div class="flash flash-error">⚠️ <%- flashError %></div><% } %>
+
+    <a href="/admin/users" class="btn btn-secondary btn-sm mb-16">← Back to Users</a>
+
+    <div class="section-header">
+      <div>
+        <div class="section-title">🎯 <%= targetUser.display_name || targetUser.username %>'s Predictions</div>
+        <div class="section-subtitle">Admin override: edit any prediction manually</div>
+      </div>
+    </div>
+
+    <div class="card" style="padding:0;overflow:hidden">
+      <table class="admin-table">
+        <thead>
+          <tr>
+            <th>Match</th>
+            <th>Round</th>
+            <th>Time (KWT)</th>
+            <th>User Prediction</th>
+            <th>AET Pick</th>
+            <th>Result</th>
+            <th>Pts</th>
+            <th>Override</th>
+          </tr>
+        </thead>
+        <tbody>
+          <% const { calculateMatchPoints } = require('../../db/database'); %>
+          <% preds.forEach(p => { %>
+          <%
+            const pts = p.result ? calculateMatchPoints(p, { result: p.result, aet_result: p.aet_result }, p) : null;
+          %>
+          <tr>
+            <td>
+              <strong><%= p.team_a %></strong>
+              <span style="color:var(--muted)"> vs </span>
+              <strong><%= p.team_b %></strong>
+            </td>
+            <td><span class="badge badge-<%= p.round === 'group' ? 'group' : 'knockout' %>"><%= p.round %></span></td>
+            <td style="font-size:.78rem;color:var(--text-dim)"><%= p.match_time_kwt %></td>
+            <td>
+              <% if (p.prediction === 'team_a') { %>
+                <span style="color:#60a5fa"><%= p.team_a %></span>
+              <% } else if (p.prediction === 'draw') { %>
+                <span style="color:var(--text-dim)">Draw</span>
+              <% } else { %>
+                <span style="color:#a78bfa"><%= p.team_b %></span>
+              <% } %>
+            </td>
+            <td style="font-size:.82rem;color:var(--text-dim)">
+              <%= p.aet_prediction === 'aet' ? 'AET' : (p.aet_prediction === '90min' ? '90 min' : '—') %>
+            </td>
+            <td style="font-size:.82rem">
+              <% if (p.result) { %>
+                <span class="result-<%= p.result %>">
+                  <%= p.result === 'team_a' ? p.team_a : (p.result === 'draw' ? 'Draw' : p.team_b) %>
+                </span>
+              <% } else { %><span class="text-muted">—</span><% } %>
+            </td>
+            <td style="font-weight:700;color:<%= pts && (pts.main + pts.bonus) > 0 ? 'var(--gold)' : 'var(--muted)' %>">
+              <%= pts ? '+' + (pts.main + pts.bonus) : '—' %>
+            </td>
+            <td>
+              <button class="btn btn-sm btn-secondary" onclick="openOverrideModal(<%= JSON.stringify({
+                uid: targetUser.id,
+                mid: p.match_id,
+                team_a: p.team_a,
+                team_b: p.team_b,
+                is_knockout: p.is_knockout,
+                prediction: p.prediction,
+                aet_prediction: p.aet_prediction
+              }) %>)">Edit</button>
+            </td>
+          </tr>
+          <% }) %>
+        </tbody>
+      </table>
+    </div>
+
+    <!-- Manual points override -->
+    <div class="card mt-24">
+      <div class="card-title">⚡ Manual Points Override (Audit Log)</div>
+      <form method="POST" action="/admin/users/<%= targetUser.id %>/points-override" style="display:flex;gap:10px;flex-wrap:wrap;align-items:flex-end">
+        <div class="form-group" style="margin:0;flex:1;min-width:200px">
+          <label class="form-label">Reason</label>
+          <input type="text" name="reason" class="form-control" placeholder="e.g. Correcting data entry error" required>
+        </div>
+        <div class="form-group" style="margin:0;width:100px">
+          <label class="form-label">Points</label>
+          <input type="number" name="points" class="form-control" placeholder="+2 or -1" required>
+        </div>
+        <button type="submit" class="btn btn-secondary">Log Override</button>
+      </form>
+      <p class="form-hint mt-8">This logs the override in the audit trail. Scoring is computed live from the database.</p>
+    </div>
+  </div>
+</div>
+
+<!-- Override modal -->
+<div id="overrideModal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.7);z-index:200;align-items:center;justify-content:center">
+  <div style="background:var(--surface);border:1px solid var(--border);border-radius:14px;padding:28px;width:100%;max-width:420px;margin:16px">
+    <h3 style="margin-bottom:16px;font-size:1rem" id="overrideTitle">Override Prediction</h3>
+    <form method="POST" id="overrideForm">
+      <div class="form-group">
+        <label class="form-label">Prediction</label>
+        <select name="prediction" id="overridePred" class="form-control" required>
+          <option value="team_a" id="ov_team_a">Team A</option>
+          <option value="draw"   id="ov_draw">Draw</option>
+          <option value="team_b" id="ov_team_b">Team B</option>
+        </select>
+      </div>
+      <div id="ovAetGroup" style="display:none" class="form-group">
+        <label class="form-label">AET Prediction</label>
+        <select name="aet_prediction" class="form-control">
+          <option value="90min">90 Minutes</option>
+          <option value="aet">AET / Penalties</option>
+        </select>
+      </div>
+      <div style="display:flex;gap:10px;margin-top:16px">
+        <button type="submit" class="btn btn-primary" style="flex:1">Save Override</button>
+        <button type="button" class="btn btn-secondary" onclick="document.getElementById('overrideModal').style.display='none'">Cancel</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<script>
+function openOverrideModal(data) {
+  document.getElementById('overrideTitle').textContent = 'Override: ' + data.team_a + ' vs ' + data.team_b;
+  document.getElementById('ov_team_a').textContent = data.team_a + ' Win';
+  document.getElementById('ov_team_b').textContent = data.team_b + ' Win';
+  document.getElementById('ov_draw').disabled = data.is_knockout;
+  document.getElementById('overridePred').value = data.prediction || 'team_a';
+  document.getElementById('ovAetGroup').style.display = data.is_knockout ? 'block' : 'none';
+  document.getElementById('overrideForm').action = '/admin/users/' + data.uid + '/predictions/' + data.mid;
+  document.getElementById('overrideModal').style.display = 'flex';
+}
+</script>
+
+<%- include('../partials/footer') %>

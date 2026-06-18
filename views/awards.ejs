@@ -1,0 +1,94 @@
+<%- include('partials/header', { currentPage: 'awards' }) %>
+
+<div class="page">
+  <div class="container" style="max-width:760px">
+
+    <% if (flashSuccess) { %><div class="flash flash-success">✅ <%- flashSuccess %></div><% } %>
+    <% if (flashError)   { %><div class="flash flash-error">⚠️ <%- flashError %></div><% } %>
+
+    <div class="section-header">
+      <div>
+        <div class="section-title">🌟 Tournament Award Predictions</div>
+        <div class="section-subtitle">10 points per correct award prediction</div>
+      </div>
+    </div>
+
+    <div class="award-grid">
+      <% categories.forEach(cat => { %>
+      <div class="award-card">
+        <div class="award-header">
+          <span class="award-name">
+            <% if (cat.name.includes('Goalscorer')) { %>🥅
+            <% } else if (cat.name.includes('Player') && !cat.name.includes('Young') && !cat.name.includes('Goal')) { %>⭐
+            <% } else if (cat.name.includes('Young')) { %>🌱
+            <% } else if (cat.name.includes('Goalkeeper')) { %>🧤
+            <% } else { %>🏅
+            <% } %>
+            &nbsp;<%= cat.name %>
+          </span>
+          <span class="award-pts">+<%= cat.points %> pts</span>
+        </div>
+
+        <div class="award-body">
+          <% if (cat.winner) { %>
+            <div class="award-winner-tag">🏆 Winner: <%= cat.winner.name %></div>
+          <% } %>
+
+          <% if (cat.is_locked && !cat.prediction) { %>
+            <p class="text-muted" style="font-size:.85rem">🔒 Predictions locked — you did not submit a prediction for this category.</p>
+
+          <% } else if (cat.prediction) { %>
+            <%
+              const predOption = cat.options.find(o => o.id === cat.prediction.option_id);
+              const correct = cat.winner && cat.winner_option_id === cat.prediction.option_id;
+            %>
+            <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:<%= !cat.is_locked ? '14px' : '0' %>">
+              <div>
+                <span style="font-size:.82rem;color:var(--text-dim)">Your pick: </span>
+                <strong><%= predOption ? predOption.name : 'Unknown' %></strong>
+              </div>
+              <% if (cat.winner) { %>
+                <span class="prediction-pill <%= correct ? 'correct' : 'incorrect' %>">
+                  <%= correct ? '✅ Correct +' + cat.points + 'pts' : '❌ Wrong' %>
+                </span>
+              <% } else { %>
+                <span class="prediction-pill saved">Submitted</span>
+              <% } %>
+            </div>
+
+            <% if (!cat.is_locked) { %>
+            <!-- Can still change -->
+            <% } %>
+          <% } %>
+
+          <% if (!cat.is_locked) { %>
+          <form method="POST" action="/awards/<%= cat.id %>/predict">
+            <select name="option_id" class="award-select" required>
+              <option value="">— Select your prediction —</option>
+              <% cat.options.forEach(opt => { %>
+              <option value="<%= opt.id %>" <%= cat.prediction && cat.prediction.option_id === opt.id ? 'selected' : '' %>>
+                <%= opt.name %>
+              </option>
+              <% }) %>
+            </select>
+            <% if (cat.options.length === 0) { %>
+              <p class="text-muted" style="font-size:.83rem;margin-bottom:10px">
+                ⚙️ The admin hasn't added options yet.
+              </p>
+            <% } %>
+            <button type="submit" class="btn btn-primary btn-sm" <%= cat.options.length === 0 ? 'disabled' : '' %>>
+              <%= cat.prediction ? '✏️ Update Pick' : '✅ Submit Pick' %>
+            </button>
+          </form>
+          <% } else if (!cat.prediction) { %>
+            <p class="text-muted" style="font-size:.83rem">🔒 Predictions are locked.</p>
+          <% } %>
+        </div>
+      </div>
+      <% }) %>
+    </div>
+
+  </div>
+</div>
+
+<%- include('partials/footer') %>

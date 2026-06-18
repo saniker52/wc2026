@@ -1,0 +1,217 @@
+<%- include('partials/header', { currentPage: 'matches' }) %>
+
+<div class="page">
+  <div class="container" style="max-width:680px">
+
+    <% if (flashSuccess) { %><div class="flash flash-success">✅ <%- flashSuccess %></div><% } %>
+    <% if (flashError)   { %><div class="flash flash-error">⚠️ <%- flashError %></div><% } %>
+
+    <a href="/matches" class="btn btn-secondary btn-sm mb-16">← Back to Matches</a>
+
+    <!-- Match header -->
+    <div class="card mb-16">
+      <div style="text-align:center;padding:8px 0 16px">
+        <% if (match.group_name) { %>
+          <span class="badge badge-group" style="margin-bottom:12px">Group <%= match.group_name %></span>
+        <% } else { %>
+          <span class="badge badge-knockout" style="margin-bottom:12px"><%= match.round.toUpperCase() %></span>
+        <% } %>
+
+        <div style="display:grid;grid-template-columns:1fr auto 1fr;align-items:center;gap:16px;margin:16px 0">
+          <div style="text-align:right">
+            <div style="font-size:1.4rem;font-weight:800">
+              <% if (match.result === 'team_a') { %>🏆 <% } %>
+              <%= match.team_a %>
+            </div>
+          </div>
+          <div style="text-align:center">
+            <% if (match.result) { %>
+              <div style="font-size:.85rem;font-weight:700;color:var(--text-dim);background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:6px 14px">
+                <% if (match.result === 'draw') { %>
+                  🤝 Draw
+                <% } else { %>
+                  <%= match.result === 'team_a' ? match.team_a : match.team_b %> wins
+                <% } %>
+                <% if (match.aet_result === 'aet') { %>
+                  <div style="font-size:.72rem;color:var(--gold);margin-top:2px">After Extra Time</div>
+                <% } else if (match.aet_result === '90min') { %>
+                  <div style="font-size:.72rem;color:var(--text-dim);margin-top:2px">90 Minutes</div>
+                <% } %>
+              </div>
+            <% } else { %>
+              <div class="vs-badge" style="width:44px;height:44px;font-size:.9rem">vs</div>
+            <% } %>
+          </div>
+          <div style="text-align:left">
+            <div style="font-size:1.4rem;font-weight:800">
+              <%= match.team_b %>
+              <% if (match.result === 'team_b') { %> 🏆<% } %>
+            </div>
+          </div>
+        </div>
+
+        <div style="font-size:.83rem;color:var(--text-dim);display:flex;justify-content:center;gap:20px;flex-wrap:wrap">
+          <span>⏰ <%= match.match_time_kwt %> (Kuwait Time)</span>
+          <span>🏟️ <%= match.stadium %>, <%= match.city %></span>
+        </div>
+
+        <% if (match.is_locked && !match.result) { %>
+          <div style="margin-top:14px">
+            <span class="badge badge-locked" style="font-size:.8rem;padding:5px 14px">🔒 Predictions Locked</span>
+          </div>
+        <% } %>
+      </div>
+    </div>
+
+    <!-- Prediction form -->
+    <% if (!match.result && !match.is_locked) { %>
+    <div class="card mb-16">
+      <div class="card-title">
+        <span class="icon">🎯</span>
+        <%= prediction ? 'Edit Your Prediction' : 'Submit Your Prediction' %>
+      </div>
+
+      <form method="POST" action="/matches/<%= match.id %>/predict" id="predictForm">
+        <p style="font-size:.85rem;color:var(--text-dim);margin-bottom:16px">
+          Who will win this match?
+        </p>
+
+        <div class="predict-options">
+          <div class="predict-option">
+            <input type="radio" name="prediction" id="pred_team_a" value="team_a"
+                   <%= prediction && prediction.prediction === 'team_a' ? 'checked' : '' %> required>
+            <label for="pred_team_a">
+              <span class="opt-team"><%= match.team_a %></span>
+              <span class="opt-label">Win</span>
+            </label>
+          </div>
+
+          <% if (!match.is_knockout) { %>
+          <div class="predict-option">
+            <input type="radio" name="prediction" id="pred_draw" value="draw"
+                   <%= prediction && prediction.prediction === 'draw' ? 'checked' : '' %>>
+            <label for="pred_draw">
+              <span class="opt-team">Draw</span>
+              <span class="opt-label">🤝</span>
+            </label>
+          </div>
+          <% } %>
+
+          <div class="predict-option">
+            <input type="radio" name="prediction" id="pred_team_b" value="team_b"
+                   <%= prediction && prediction.prediction === 'team_b' ? 'checked' : '' %>>
+            <label for="pred_team_b">
+              <span class="opt-team"><%= match.team_b %></span>
+              <span class="opt-label">Win</span>
+            </label>
+          </div>
+        </div>
+
+        <% if (match.is_knockout) { %>
+        <hr class="divider">
+        <p style="font-size:.85rem;color:var(--text-dim);margin-bottom:12px">
+          ⭐ Bonus point: How will this match be decided?
+        </p>
+        <div class="aet-options">
+          <div class="aet-option">
+            <input type="radio" name="aet_prediction" id="aet_90" value="90min"
+                   <%= prediction && prediction.aet_prediction === '90min' ? 'checked' : '' %>>
+            <label for="aet_90">
+              <span class="aet-icon">⏱️</span>
+              <span class="aet-label">90 Minutes</span>
+              <span class="aet-desc">Normal time</span>
+            </label>
+          </div>
+          <div class="aet-option">
+            <input type="radio" name="aet_prediction" id="aet_aet" value="aet"
+                   <%= prediction && prediction.aet_prediction === 'aet' ? 'checked' : '' %>>
+            <label for="aet_aet">
+              <span class="aet-icon">🥅</span>
+              <span class="aet-label">AET / Penalties</span>
+              <span class="aet-desc">After extra time</span>
+            </label>
+          </div>
+        </div>
+        <% } %>
+
+        <button type="submit" class="btn btn-primary btn-lg" style="width:100%;margin-top:16px">
+          <%= prediction ? '✏️ Update Prediction' : '✅ Submit Prediction' %>
+        </button>
+      </form>
+    </div>
+
+    <% } else if (prediction) { %>
+    <!-- Show submitted prediction -->
+    <div class="card mb-16">
+      <div class="card-title">🎯 Your Prediction</div>
+      <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap">
+        <div>
+          <strong style="font-size:1rem">
+            <%= prediction.prediction === 'team_a' ? match.team_a : (prediction.prediction === 'draw' ? 'Draw' : match.team_b) %>
+          </strong>
+          <% if (prediction.aet_prediction) { %>
+            · <span style="color:var(--text-dim);font-size:.85rem">
+              <%= prediction.aet_prediction === 'aet' ? 'AET/Penalties' : '90 Minutes' %>
+            </span>
+          <% } %>
+        </div>
+
+        <% if (match.result) { %>
+          <% if (pts && pts.main > 0) { %>
+            <span class="prediction-pill correct">✅ Correct · +<%= pts.main + pts.bonus %> pts</span>
+            <% if (pts.bonus > 0) { %><span class="badge badge-result">⭐ Bonus +1</span><% } %>
+          <% } else { %>
+            <span class="prediction-pill incorrect">❌ Wrong · +0 pts</span>
+          <% } %>
+        <% } else { %>
+          <span class="prediction-pill locked">🔒 Locked in</span>
+        <% } %>
+      </div>
+    </div>
+    <% } else if (match.is_locked) { %>
+    <div class="card mb-16 text-center text-muted" style="padding:24px">
+      🔒 Predictions are locked for this match and you did not submit one.
+    </div>
+    <% } %>
+
+    <!-- Other users' predictions (visible when locked or result in) -->
+    <% if (otherPreds && otherPreds.length > 0) { %>
+    <div class="card">
+      <div class="card-title">👥 Other Predictions</div>
+      <table class="admin-table">
+        <thead>
+          <tr>
+            <th>Player</th>
+            <th>Prediction</th>
+            <% if (match.is_knockout) { %><th>90min / AET</th><% } %>
+          </tr>
+        </thead>
+        <tbody>
+          <% otherPreds.forEach(p => { %>
+          <tr>
+            <td><strong><%= p.display_name || p.username %></strong></td>
+            <td>
+              <% if (p.prediction === 'team_a') { %>
+                <span style="color:#60a5fa"><%= match.team_a %></span>
+              <% } else if (p.prediction === 'draw') { %>
+                <span style="color:var(--text-dim)">Draw</span>
+              <% } else { %>
+                <span style="color:#a78bfa"><%= match.team_b %></span>
+              <% } %>
+            </td>
+            <% if (match.is_knockout) { %>
+            <td style="color:var(--text-dim);font-size:.85rem">
+              <%= p.aet_prediction === 'aet' ? 'AET' : '90 min' %>
+            </td>
+            <% } %>
+          </tr>
+          <% }) %>
+        </tbody>
+      </table>
+    </div>
+    <% } %>
+
+  </div>
+</div>
+
+<%- include('partials/footer') %>

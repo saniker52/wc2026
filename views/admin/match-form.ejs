@@ -1,0 +1,77 @@
+<%- include('../partials/header', { currentPage: '' }) %>
+<%- include('../partials/admin-nav', { adminPage: 'matches' }) %>
+
+<div class="page">
+  <div class="container" style="max-width:600px">
+
+    <% if (flashError) { %><div class="flash flash-error">⚠️ <%- flashError %></div><% } %>
+
+    <a href="/admin/matches" class="btn btn-secondary btn-sm mb-16">← Back to Matches</a>
+
+    <div class="card">
+      <div class="card-title"><%= match ? '✏️ Edit Match' : '+ Add Match' %></div>
+
+      <form method="POST" action="<%= match ? '/admin/matches/' + match.id : '/admin/matches' %>">
+        <div class="form-row cols-2">
+          <div class="form-group">
+            <label class="form-label">Round *</label>
+            <select name="round" class="form-control" required>
+              <option value="group"  <%= match?.round === 'group'  ? 'selected' : '' %>>Group Stage</option>
+              <option value="r32"    <%= match?.round === 'r32'    ? 'selected' : '' %>>Round of 32</option>
+              <option value="r16"    <%= match?.round === 'r16'    ? 'selected' : '' %>>Round of 16</option>
+              <option value="qf"     <%= match?.round === 'qf'     ? 'selected' : '' %>>Quarterfinal</option>
+              <option value="sf"     <%= match?.round === 'sf'     ? 'selected' : '' %>>Semifinal</option>
+              <option value="3rd"    <%= match?.round === '3rd'    ? 'selected' : '' %>>3rd Place</option>
+              <option value="final"  <%= match?.round === 'final'  ? 'selected' : '' %>>Final</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label class="form-label">Group (A–L, for group stage)</label>
+            <input type="text" name="group_name" class="form-control"
+                   value="<%= match?.group_name || '' %>" maxlength="1" placeholder="e.g. A">
+          </div>
+        </div>
+
+        <div class="form-row cols-2">
+          <div class="form-group">
+            <label class="form-label">Team A *</label>
+            <input type="text" name="team_a" class="form-control" required
+                   value="<%= match?.team_a || '' %>" placeholder="e.g. Brazil">
+          </div>
+          <div class="form-group">
+            <label class="form-label">Team B *</label>
+            <input type="text" name="team_b" class="form-control" required
+                   value="<%= match?.team_b || '' %>" placeholder="e.g. Argentina">
+          </div>
+        </div>
+
+        <div class="form-group">
+          <label class="form-label">Match Time (Kuwait Time) *</label>
+          <input type="datetime-local" name="match_time_kwt" class="form-control" required
+                 value="<%= match ? new Date(new Date(match.match_time).getTime() + 3*3600000).toISOString().slice(0,16) : '' %>">
+          <div class="form-hint">Enter the kickoff time in Kuwait Time (UTC+3). It will be converted to UTC for storage.</div>
+        </div>
+
+        <div class="form-row cols-2">
+          <div class="form-group">
+            <label class="form-label">Stadium</label>
+            <input type="text" name="stadium" class="form-control"
+                   value="<%= match?.stadium || '' %>" placeholder="e.g. MetLife Stadium">
+          </div>
+          <div class="form-group">
+            <label class="form-label">City</label>
+            <input type="text" name="city" class="form-control"
+                   value="<%= match?.city || '' %>" placeholder="e.g. East Rutherford, NJ">
+          </div>
+        </div>
+
+        <div style="display:flex;gap:10px">
+          <button type="submit" class="btn btn-primary"><%= match ? '💾 Save Changes' : '+ Add Match' %></button>
+          <a href="/admin/matches" class="btn btn-secondary">Cancel</a>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+
+<%- include('../partials/footer') %>

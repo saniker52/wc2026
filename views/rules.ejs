@@ -1,0 +1,106 @@
+<%- include('partials/header', { currentPage: 'rules' }) %>
+
+<div class="page">
+  <div class="container" style="max-width:760px">
+
+    <div class="section-header">
+      <div class="section-title">📋 Competition Rules</div>
+    </div>
+
+    <div class="card">
+
+      <div class="rules-section">
+        <h3>🎯 How to Play</h3>
+        <p style="font-size:.9rem;color:var(--text-dim);line-height:1.8">
+          Predict the outcome of every FIFA World Cup 2026 match. For each match, select the winning team (or Draw in group stage).
+          In knockout rounds, also predict whether the match ends in 90 minutes or goes to AET/Penalties for a bonus point.
+          Earn points for correct predictions and compete with your friends on the leaderboard!
+        </p>
+      </div>
+
+      <hr class="divider">
+
+      <div class="rules-section">
+        <h3>⚽ Group Stage (72 matches)</h3>
+        <p style="font-size:.9rem;color:var(--text-dim);margin-bottom:12px">Choose: <strong>Team A Win</strong> · <strong>Draw</strong> · <strong>Team B Win</strong></p>
+        <table class="rules-table">
+          <thead><tr><th>Outcome</th><th>Points</th></tr></thead>
+          <tbody>
+            <tr><td>✅ Correct prediction</td><td><strong style="color:var(--gold)">1 point</strong></td></tr>
+            <tr><td>❌ Wrong prediction</td><td>0 points</td></tr>
+            <tr><td>Maximum group stage total</td><td><strong style="color:var(--gold)">72 points</strong></td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <hr class="divider">
+
+      <div class="rules-section">
+        <h3>🏆 Knockout Stage</h3>
+        <p style="font-size:.9rem;color:var(--text-dim);margin-bottom:12px">
+          Choose the <strong>winning team</strong> (no draws). Also predict: <strong>90 Minutes</strong> or <strong>AET/Penalties</strong> for a bonus point.
+          Bonus is only awarded if you also correctly predicted the winner.
+        </p>
+        <table class="rules-table">
+          <thead>
+            <tr>
+              <th>Round</th>
+              <th>Correct Winner</th>
+              <th>AET Bonus</th>
+              <th>Max per match</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr><td>Round of 32</td><td><strong style="color:var(--gold)">2 pts</strong></td><td>+1 pt</td><td>3 pts</td></tr>
+            <tr><td>Round of 16</td><td><strong style="color:var(--gold)">3 pts</strong></td><td>+1 pt</td><td>4 pts</td></tr>
+            <tr><td>Quarterfinals</td><td><strong style="color:var(--gold)">4 pts</strong></td><td>+1 pt</td><td>5 pts</td></tr>
+            <tr><td>Semifinals</td><td><strong style="color:var(--gold)">5 pts</strong></td><td>+1 pt</td><td>6 pts</td></tr>
+            <tr><td>3rd Place Match</td><td><strong style="color:var(--gold)">4 pts</strong></td><td>+1 pt</td><td>5 pts</td></tr>
+            <tr><td>⭐ Final</td><td><strong style="color:var(--gold)">6 pts</strong></td><td>+1 pt</td><td>7 pts</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <hr class="divider">
+
+      <div class="rules-section">
+        <h3>🌟 Tournament Award Predictions</h3>
+        <p style="font-size:.9rem;color:var(--text-dim);margin-bottom:12px">Submit before the tournament locks. Each correct pick is worth 10 points.</p>
+        <table class="rules-table">
+          <thead><tr><th>Award</th><th>Points</th></tr></thead>
+          <tbody>
+            <tr><td>🥅 Top Goalscorer</td><td><strong style="color:var(--gold)">10 pts</strong></td></tr>
+            <tr><td>⭐ Best Player (Golden Ball)</td><td><strong style="color:var(--gold)">10 pts</strong></td></tr>
+            <tr><td>🌱 Best Young Player</td><td><strong style="color:var(--gold)">10 pts</strong></td></tr>
+            <tr><td>🧤 Best Goalkeeper (Golden Glove)</td><td><strong style="color:var(--gold)">10 pts</strong></td></tr>
+            <tr><td>🏅 Fair Play Award</td><td><strong style="color:var(--gold)">10 pts</strong></td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <hr class="divider">
+
+      <div class="rules-section">
+        <h3>🔒 Prediction Locks</h3>
+        <p style="font-size:.9rem;color:var(--text-dim);line-height:1.8">
+          The admin will lock predictions before each match or round begins. Once locked, you cannot change your prediction.
+          Make sure to submit early! You can edit your prediction at any time before the lock.
+          Locked predictions are final — no exceptions.
+        </p>
+      </div>
+
+      <hr class="divider">
+
+      <div class="rules-section" style="margin-bottom:0">
+        <h3>🕐 Times</h3>
+        <p style="font-size:.9rem;color:var(--text-dim);line-height:1.8">
+          All match times on this platform are displayed in <strong style="color:var(--text)">Kuwait Time (UTC+3)</strong>.
+          Make sure to submit predictions before kickoff time shown on each match card.
+        </p>
+      </div>
+
+    </div>
+  </div>
+</div>
+
+<%- include('partials/footer') %>

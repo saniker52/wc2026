@@ -1,0 +1,83 @@
+<%- include('../partials/header', { currentPage: '' }) %>
+<%- include('../partials/admin-nav', { adminPage: 'awards' }) %>
+
+<div class="page">
+  <div class="container" style="max-width:800px">
+
+    <% if (flashSuccess) { %><div class="flash flash-success">✅ <%- flashSuccess %></div><% } %>
+    <% if (flashError)   { %><div class="flash flash-error">⚠️ <%- flashError %></div><% } %>
+
+    <div class="section-title mb-16">🌟 Manage Award Predictions</div>
+
+    <div class="award-grid">
+      <% categories.forEach(cat => { %>
+      <div class="award-card">
+        <div class="award-header">
+          <span class="award-name"><%= cat.name %></span>
+          <div style="display:flex;align-items:center;gap:8px">
+            <span class="award-pts"><%= cat.points %> pts</span>
+            <% if (cat.is_locked) { %>
+              <span class="badge badge-locked">🔒 Locked</span>
+            <% } else { %>
+              <span class="badge badge-open">🟢 Open</span>
+            <% } %>
+          </div>
+        </div>
+
+        <div class="award-body">
+          <!-- Options list -->
+          <div style="margin-bottom:14px">
+            <div style="font-size:.78rem;color:var(--text-dim);margin-bottom:8px;font-weight:600">OPTIONS:</div>
+            <% if (cat.options.length === 0) { %>
+              <p style="font-size:.83rem;color:var(--muted)">No options added yet.</p>
+            <% } else { %>
+            <div style="display:flex;flex-wrap:wrap;gap:6px">
+              <% cat.options.forEach(opt => { %>
+              <div style="display:flex;align-items:center;gap:4px;background:var(--bg);border:1px solid var(--border);border-radius:6px;padding:3px 10px;font-size:.82rem;
+                <%= cat.winner_option_id === opt.id ? 'border-color:var(--gold);color:var(--gold)' : '' %>">
+                <% if (cat.winner_option_id === opt.id) { %>🏆 <% } %>
+                <%= opt.name %>
+                <form method="POST" action="/admin/awards/options/<%= opt.id %>/delete" style="display:inline" onsubmit="return confirm('Delete this option?')">
+                  <button style="background:none;border:none;cursor:pointer;color:var(--muted);font-size:.8rem;padding:0 0 0 4px" title="Delete">✕</button>
+                </form>
+              </div>
+              <% }) %>
+            </div>
+            <% } %>
+          </div>
+
+          <!-- Add option -->
+          <form method="POST" action="/admin/awards/<%= cat.id %>/options" style="display:flex;gap:8px;margin-bottom:14px">
+            <input type="text" name="name" class="form-control" placeholder="Add option (e.g. Messi)" style="flex:1" required>
+            <button class="btn btn-sm btn-secondary">Add</button>
+          </form>
+
+          <!-- Set winner -->
+          <% if (cat.options.length > 0) { %>
+          <form method="POST" action="/admin/awards/<%= cat.id %>/winner" style="display:flex;gap:8px;margin-bottom:14px;align-items:center">
+            <select name="winner_option_id" class="form-control" style="flex:1">
+              <option value="">— Set official winner —</option>
+              <% cat.options.forEach(opt => { %>
+                <option value="<%= opt.id %>" <%= cat.winner_option_id === opt.id ? 'selected' : '' %>><%= opt.name %></option>
+              <% }) %>
+            </select>
+            <button class="btn btn-sm btn-primary">🏆 Set</button>
+          </form>
+          <% } %>
+
+          <!-- Lock / Unlock -->
+          <form method="POST" action="/admin/awards/<%= cat.id %>/lock">
+            <% if (cat.is_locked) { %>
+              <button name="action" value="unlock" class="btn btn-sm btn-success">🔓 Unlock Predictions</button>
+            <% } else { %>
+              <button name="action" value="lock" class="btn btn-sm btn-danger">🔒 Lock Predictions</button>
+            <% } %>
+          </form>
+        </div>
+      </div>
+      <% }) %>
+    </div>
+  </div>
+</div>
+
+<%- include('../partials/footer') %>

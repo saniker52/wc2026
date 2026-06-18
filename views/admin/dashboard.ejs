@@ -1,0 +1,130 @@
+<%- include('../partials/header', { currentPage: '' }) %>
+<%- include('../partials/admin-nav', { adminPage: 'dashboard' }) %>
+
+<div class="page">
+  <div class="container">
+
+    <% if (flashSuccess) { %><div class="flash flash-success">✅ <%- flashSuccess %></div><% } %>
+    <% if (flashError)   { %><div class="flash flash-error">⚠️ <%- flashError %></div><% } %>
+
+    <div style="display:flex;align-items:center;gap:12px;margin-bottom:24px">
+      <h1 style="font-size:1.5rem;font-weight:800">⚙️ Admin Dashboard</h1>
+      <span class="admin-badge">Admin</span>
+    </div>
+
+    <!-- Stats -->
+    <div class="stats-grid" style="grid-template-columns:repeat(auto-fit,minmax(140px,1fr))">
+      <div class="stat-card">
+        <div class="stat-value"><%= stats.totalUsers %></div>
+        <div class="stat-label">Players</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-value"><%= stats.totalMatches %></div>
+        <div class="stat-label">Matches</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-value" style="color:var(--green)"><%= stats.resultsIn %></div>
+        <div class="stat-label">Results In</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-value" style="color:var(--red)"><%= stats.lockedCount %></div>
+        <div class="stat-label">Locked</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-value" style="color:var(--blue)"><%= stats.totalPreds %></div>
+        <div class="stat-label">Total Predictions</div>
+      </div>
+    </div>
+
+    <!-- Quick actions -->
+    <div style="display:grid;gap:20px;grid-template-columns:1fr 1fr;margin-bottom:28px" class="admin-2col">
+      <!-- Pending results -->
+      <div>
+        <div class="section-header">
+          <div class="section-title">⏳ Awaiting Results</div>
+          <a href="/admin/results" class="btn btn-primary btn-sm">Enter Results →</a>
+        </div>
+        <% if (pendingResults.length === 0) { %>
+          <div class="card text-center text-muted" style="padding:24px">All played matches have results ✅</div>
+        <% } else { %>
+        <div class="card" style="padding:0;overflow:hidden">
+          <table class="admin-table">
+            <thead>
+              <tr>
+                <th>Match</th>
+                <th>Round</th>
+                <th>Time (KWT)</th>
+                <th></th>
+              </tr>
+            </thead>
+            <tbody>
+              <% pendingResults.forEach(m => { %>
+              <tr>
+                <td><strong><%= m.team_a %></strong> vs <strong><%= m.team_b %></strong></td>
+                <td><span class="badge badge-<%= m.round === 'group' ? 'group' : 'knockout' %>"><%= m.round %></span></td>
+                <td style="font-size:.8rem;color:var(--text-dim)"><%= m.match_time_kwt %></td>
+                <td><a href="/admin/results?round=<%= m.round %>" class="btn btn-sm btn-primary">Enter</a></td>
+              </tr>
+              <% }) %>
+            </tbody>
+          </table>
+        </div>
+        <% } %>
+      </div>
+
+      <!-- Recent admin activity -->
+      <div>
+        <div class="section-header">
+          <div class="section-title">📋 Recent Activity</div>
+          <a href="/admin/log" class="btn btn-secondary btn-sm">Full Log</a>
+        </div>
+        <div class="card" style="padding:0;overflow:hidden">
+          <% if (recentLog.length === 0) { %>
+            <div class="text-center text-muted" style="padding:24px;font-size:.85rem">No activity yet.</div>
+          <% } else { %>
+          <table class="admin-table">
+            <thead><tr><th>Admin</th><th>Action</th><th>Time</th></tr></thead>
+            <tbody>
+              <% recentLog.forEach(l => { %>
+              <tr>
+                <td style="font-size:.8rem"><%= l.username %></td>
+                <td style="font-size:.8rem;color:var(--text-dim)">
+                  <strong style="color:var(--text)"><%= l.action %></strong>
+                  <% if (l.details) { %><div style="font-size:.72rem;color:var(--muted)"><%= l.details %></div><% } %>
+                </td>
+                <td style="font-size:.73rem;color:var(--muted);white-space:nowrap"><%= l.created_at.slice(0,16).replace('T',' ') %></td>
+              </tr>
+              <% }) %>
+            </tbody>
+          </table>
+          <% } %>
+        </div>
+      </div>
+    </div>
+
+    <!-- Quick lock by round -->
+    <div class="card">
+      <div class="card-title">🔒 Quick Lock / Unlock by Round</div>
+      <form method="POST" action="/admin/matches/lock-round" style="display:flex;gap:10px;align-items:center;flex-wrap:wrap">
+        <select name="round" class="form-control" style="max-width:180px">
+          <option value="group">Group Stage (all)</option>
+          <option value="r32">Round of 32</option>
+          <option value="r16">Round of 16</option>
+          <option value="qf">Quarterfinals</option>
+          <option value="sf">Semifinals</option>
+          <option value="3rd">Third Place</option>
+          <option value="final">Final</option>
+        </select>
+        <button type="submit" name="action" value="lock" class="btn btn-danger">🔒 Lock All</button>
+        <button type="submit" name="action" value="unlock" class="btn btn-success">🔓 Unlock All</button>
+      </form>
+    </div>
+
+  </div>
+</div>
+
+<style>
+@media (max-width: 700px) { .admin-2col { grid-template-columns: 1fr !important; } }
+</style>
+
+<%- include('../partials/footer') %>

@@ -1,0 +1,38 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title><%= title %> | WC2026 Predictions</title>
+  <link rel="stylesheet" href="/css/style.css">
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>⚽</text></svg>">
+</head>
+<body>
+
+<% if (user) { %>
+<nav class="navbar">
+  <div class="navbar-inner">
+    <a class="navbar-brand" href="/dashboard">
+      <span class="ball">⚽</span> WC 2026
+    </a>
+
+    <button class="navbar-toggle" onclick="document.querySelector('.navbar-menu').classList.toggle('open')" aria-label="Menu">☰</button>
+
+    <div class="navbar-menu">
+      <ul class="navbar-nav">
+        <li><a href="/dashboard" class="<%= locals.currentPage === 'dashboard' ? 'active' : '' %>">Dashboard</a></li>
+        <li><a href="/matches"   class="<%= locals.currentPage === 'matches'   ? 'active' : '' %>">Matches</a></li>
+        <li><a href="/leaderboard" class="<%= locals.currentPage === 'leaderboard' ? 'active' : '' %>">Leaderboard</a></li>
+        <li><a href="/awards"    class="<%= locals.currentPage === 'awards'    ? 'active' : '' %>">Awards</a></li>
+        <li><a href="/rules"     class="<%= locals.currentPage === 'rules'     ? 'active' : '' %>">Rules</a></li>
+        <% if (user.is_admin) { %><li><a href="/admin" style="color:#f87171">Admin</a></li><% } %>
+      </ul>
+      <div class="navbar-user">
+        <span class="username">👤 <%= user.display_name %></span>
+        <a href="/change-password" class="btn-logout">Password</a>
+        <a href="/logout" class="btn-logout">Log out</a>
+      </div>
+    </div>
+  </div>
+</nav>
+<% } %>

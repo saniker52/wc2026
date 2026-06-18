@@ -1,0 +1,82 @@
+<%- include('partials/header', { currentPage: 'leaderboard' }) %>
+
+<div class="page">
+  <div class="container">
+
+    <div class="section-header">
+      <div>
+        <div class="section-title">🏆 Leaderboard</div>
+        <div class="section-subtitle">Updated: <%= updatedAt %> (Kuwait Time)</div>
+      </div>
+    </div>
+
+    <!-- Filter tabs -->
+    <div class="lb-filters">
+      <a href="/leaderboard" class="lb-filter-btn <%= filter === 'overall' ? 'active' : '' %>">🌍 Overall</a>
+      <a href="/leaderboard?filter=group"   class="lb-filter-btn <%= filter === 'group'   ? 'active' : '' %>">Group Stage</a>
+      <a href="/leaderboard?filter=knockout" class="lb-filter-btn <%= filter === 'knockout' ? 'active' : '' %>">Knockout Stage</a>
+      <a href="/leaderboard?filter=awards"  class="lb-filter-btn <%= filter === 'awards'  ? 'active' : '' %>">Award Picks</a>
+    </div>
+
+    <div class="card" style="padding:0;overflow:hidden">
+      <% if (rows.length === 0) { %>
+        <div class="text-center text-muted" style="padding:40px">No users to show yet.</div>
+      <% } else { %>
+      <table class="leaderboard-table">
+        <thead>
+          <tr>
+            <th style="width:50px">#</th>
+            <th>Player</th>
+            <th class="text-right"><%= filter === 'overall' ? 'Total Pts' : (filter === 'group' ? 'Group Pts' : (filter === 'knockout' ? 'KO + Bonus' : 'Award Pts')) %></th>
+            <% if (filter === 'overall') { %>
+            <th class="text-right" style="display:table-cell">Group</th>
+            <th class="text-right" style="display:table-cell">Knockout</th>
+            <th class="text-right" style="display:table-cell">Bonus</th>
+            <th class="text-right" style="display:table-cell">Awards</th>
+            <% } %>
+            <th class="text-right">✅ Correct</th>
+          </tr>
+        </thead>
+        <tbody>
+          <% rows.forEach(r => { %>
+          <tr class="<%= r.id === myId ? 'me' : '' %> rank-<%= r.rank %>">
+            <td class="rank-cell">
+              <% if (r.rank === 1) { %>🥇
+              <% } else if (r.rank === 2) { %>🥈
+              <% } else if (r.rank === 3) { %>🥉
+              <% } else { %><%= r.rank %>
+              <% } %>
+            </td>
+            <td>
+              <strong><%= r.display_name %></strong>
+              <% if (r.id === myId) { %><span class="me-tag">You</span><% } %>
+            </td>
+            <td class="text-right total-pts"><%= r.display_total %></td>
+            <% if (filter === 'overall') { %>
+            <td class="text-right text-muted"><%= r.group_pts %></td>
+            <td class="text-right text-muted"><%= r.knockout_pts %></td>
+            <td class="text-right" style="color:var(--gold)"><%= r.bonus_pts %></td>
+            <td class="text-right text-muted"><%= r.award_pts %></td>
+            <% } %>
+            <td class="text-right"><%= r.correct %></td>
+          </tr>
+          <% }) %>
+        </tbody>
+      </table>
+      <% } %>
+    </div>
+
+    <!-- Scoring reminder -->
+    <div class="card mt-24" style="padding:16px 20px">
+      <div style="font-size:.82rem;color:var(--text-dim);display:flex;flex-wrap:wrap;gap:16px;align-items:center">
+        <span>📋 <strong style="color:var(--text)">Scoring:</strong></span>
+        <span>Group: 1pt · R32: 2pts · R16: 3pts · QF: 4pts · SF: 5pts · Final: 6pts</span>
+        <span>⭐ +1 bonus for correct AET prediction (knockout only)</span>
+        <span>🏆 +10pts per correct award prediction</span>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<%- include('partials/footer') %>
