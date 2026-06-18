@@ -121,6 +121,87 @@ function seedInitialData() {
     db.prepare(`INSERT OR REPLACE INTO db_meta (key, value) VALUES ('version', ?)`).run(String(DB_VERSION));
     console.log(`✅ Fixtures migrated to v${DB_VERSION}`);
   }
+
+  // ── Seed competition users + predictions ───────────────────────────────────
+  seedUsersAndPredictions();
+}
+
+function seedUsersAndPredictions() {
+  const alreadySeeded = db.prepare(`SELECT value FROM db_meta WHERE key='users_seeded'`).get();
+  if (alreadySeeded) return;
+
+  // First 24 group matches in chronological order
+  const matches24 = db.prepare(
+    "SELECT id, team_a, team_b FROM matches WHERE round='group' ORDER BY match_time, id LIMIT 24"
+  ).all();
+  if (matches24.length < 24) {
+    console.log('⚠️  Skipping user seed — fixtures not ready yet');
+    return;
+  }
+
+  // Strip emoji flags + lowercase for matching
+  function norm(s) {
+    return s.replace(/[\u{1F1E0}-\u{1F1FF}\u{1F3F4}\u{1F3F3}]/gu, '').trim().toLowerCase();
+  }
+  const ALIASES = { turkey: 'türkiye', columbia: 'colombia', bosnia: 'bosnia & herz.' };
+  function mapPred(text, match) {
+    if (!text || text.toLowerCase() === 'draw') return 'draw';
+    const p = ALIASES[text.toLowerCase()] || text.toLowerCase();
+    const a = norm(match.team_a), b = norm(match.team_b);
+    if (a.includes(p) || p.includes(a)) return 'team_a';
+    if (b.includes(p) || p.includes(b)) return 'team_b';
+    console.warn(`  ⚠️  No match for "${text}" in "${match.team_a}" vs "${match.team_b}"`);
+    return null;
+  }
+
+  const USERS = [
+    { name:'Abdulaziz Aljanahi',  username:'Aljanahi',   password:'1122', preds:['Mexico','South Korea','Bosnia','Paraguay','Qatar','Morocco','Scotland','Turkey','Germany','Netherlands','Ecuador','Tunisia','Spain','Egypt','Uruguay','Iran','Senegal','Iraq','Algeria','Jordan','Portugal','Croatia','Ghana','Uzbekistan'] },
+    { name:'Abdulaziz Alshabaan', username:'Alshabaan',  password:'2233', preds:['Draw','South Korea','Bosnia','USA','Switzerland','Brazil','Scotland','Turkey','Germany','Netherlands','Ecuador','Sweden','Spain','Belgium','Uruguay','New Zealand','France','Norway','Argentina','Jordan','Portugal','Draw','Ghana','Columbia'] },
+    { name:'Abdulaziz Alyaseen',  username:'Alyaseen',   password:'3344', preds:['Mexico','Draw','Canada','USA','Switzerland','Morocco','Scotland','Draw','Germany','Netherlands','Ecuador','Sweden','Spain','Belgium','Uruguay','Iran','France','Norway','Argentina','Austria','Portugal','England','Draw','Columbia'] },
+    { name:'Abdulwahab Alghanim', username:'Alghanim',   password:'4455', preds:['Mexico','Draw','Draw','USA','Switzerland','Draw','Scotland','Turkey','Germany','Netherlands','Ecuador','Tunisia','Spain','Draw','Draw','Iran','France','Norway','Argentina','Austria','Portugal','England','Ghana','Columbia'] },
+    { name:'Barjas Albarjas',     username:'Albarjas',   password:'5566', preds:['Mexico','Draw','Canada','USA','Switzerland','Brazil','Scotland','Turkey','Germany','Netherlands','Ivory Coast','Sweden','Spain','Belgium','Uruguay','Iran','France','Norway','Argentina','Austria','Portugal','England','Ghana','Columbia'] },
+    { name:'Eid Almeshwat',       username:'Almeshwat',  password:'6677', preds:['Mexico','South Korea','Canada','USA','Switzerland','Brazil','Scotland','Australia','Germany','Netherlands','Ecuador','Sweden','Spain','Belgium','Uruguay','New Zealand','France','Norway','Argentina','Austria','Portugal','England','Ghana','Columbia'] },
+    { name:'Fahad Alfulaij',      username:'Alfulaij',   password:'7788', preds:['Mexico','Draw','Canada','USA','Switzerland','Brazil','Draw','Australia','Germany','Netherlands','Ecuador','Sweden','Spain','Belgium','Uruguay','Draw','France','Norway','Argentina','Draw','Portugal','Croatia','Ghana','Columbia'] },
+    { name:'Fahad Algashaan',     username:'Algashaan',  password:'8899', preds:['Mexico','South Korea','Canada','USA','Switzerland','Morocco','Scotland','Draw','Germany','Draw','Ivory Coast','Tunisia','Spain','Egypt','Draw','Iran','France','Norway','Argentina','Jordan','Portugal','England','Ghana','Columbia'] },
+    { name:'Hamad Almubarak',     username:'Almubarak',  password:'9900', preds:['Mexico','South Korea','Bosnia','USA','Switzerland','Brazil','Scotland','Turkey','Germany','Japan','Ivory Coast','Sweden','Spain','Belgium','Saudi Arabia','Iran','France','Norway','Argentina','Austria','Portugal','England','Ghana','Columbia'] },
+    { name:'Hamad Almudhaf',      username:'Halmudhaf',  password:'1234', preds:['Mexico','Draw','Canada','Draw','Switzerland','Brazil','Draw','Turkey','Germany','Netherlands','Draw','Draw','Spain','Draw','Uruguay','Draw','France','Norway','Draw','Draw','Portugal','Draw','Draw','Columbia'] },
+    { name:'Khaled Almudhaf',     username:'Kalmudhaf',  password:'5678', preds:['Mexico','Czechia','Bosnia','Draw','Switzerland','Brazil','Scotland','Turkey','Germany','Netherlands','Ecuador','Sweden','Spain','Belgium','Uruguay','New Zealand','France','Norway','Draw','Austria','Portugal','Draw','Ghana','Columbia'] },
+    { name:'Mohammed Alajran',    username:'Alajran',    password:'4321', preds:['Mexico','Draw','Canada','Paraguay','Switzerland','Brazil','Scotland','Turkey','Germany','Netherlands','Draw','Tunisia','Spain','Egypt','Saudi Arabia','Draw','France','Norway','Argentina','Austria','Portugal','England','Draw','Draw'] },
+    { name:'Mohammed Albargash',  username:'Albargash',  password:'8765', preds:['Mexico','South Korea','Canada','Paraguay','Qatar','Brazil','Scotland','Turkey','Germany','Japan','Ecuador','Tunisia','Spain','Belgium','Saudi Arabia','Iran','France','Norway','Argentina','Austria','Portugal','England','Ghana','Columbia'] },
+    { name:'Musaad Almajdeli',    username:'Malmajdeli', password:'2211', preds:['Mexico','Draw','Bosnia','Paraguay','Switzerland','Draw','Scotland','Turkey','Germany','Draw','Ivory Coast','Draw','Spain','Belgium','Uruguay','Draw','Draw','Draw','Draw','Draw','Portugal','England','Ghana','Columbia'] },
+    { name:'Sager Alameeri',      username:'Alameeri',   password:'3322', preds:['Mexico','Draw','Draw','USA','Switzerland','Brazil','Scotland','Turkey','Germany','Netherlands','Ivory Coast','Sweden','Spain','Belgium','Uruguay','Draw','France','Norway','Argentina','Jordan','Portugal','England','Ghana','Columbia'] },
+    { name:'Saoud Almajdeli',     username:'Salmajdeli', password:'4433', preds:['Mexico','Czechia','Canada','USA','Switzerland','Draw','Scotland','Turkey','Germany','Draw','Ecuador','Sweden','Spain','Belgium','Uruguay','Draw','France','Norway','Argentina','Austria','Portugal','Draw','Draw','Columbia'] },
+    { name:'Talal Almurjan',      username:'Almurjan',   password:'5544', preds:['Mexico','South Korea','Draw','Draw','Switzerland','Brazil','Scotland','Turkey','Germany','Draw','Draw','Sweden','Spain','Belgium','Uruguay','Iran','France','Norway','Argentina','Draw','Portugal','Draw','Draw','Columbia'] },
+  ];
+
+  const insertUser = db.prepare(
+    'INSERT OR IGNORE INTO users (username, display_name, password_hash, is_admin) VALUES (?, ?, ?, 0)'
+  );
+  const upsertPred = db.prepare(`
+    INSERT INTO predictions (user_id, match_id, prediction, aet_prediction, updated_at)
+    VALUES (?, ?, ?, NULL, CURRENT_TIMESTAMP)
+    ON CONFLICT (user_id, match_id) DO UPDATE SET
+      prediction = excluded.prediction,
+      updated_at = CURRENT_TIMESTAMP
+  `);
+  const getUser = db.prepare('SELECT id FROM users WHERE username = ?');
+
+  const doSeed = db.transaction(() => {
+    let created = 0, preds = 0;
+    for (const u of USERS) {
+      insertUser.run(u.username, u.name, bcrypt.hashSync(String(u.password), 10));
+      const userId = getUser.get(u.username).id;
+      if (!getUser.get(u.username)) continue;
+      created++;
+      u.preds.forEach((text, i) => {
+        const pred = mapPred(text, matches24[i]);
+        if (pred) { upsertPred.run(userId, matches24[i].id, pred); preds++; }
+      });
+    }
+    db.prepare(`INSERT OR REPLACE INTO db_meta (key, value) VALUES ('users_seeded', '1')`).run();
+    console.log(`✅ Seeded ${USERS.length} users + ${preds} predictions`);
+  });
+  doSeed();
 }
 
 function seedMatches() {
