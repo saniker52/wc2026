@@ -1,5 +1,82 @@
 <%- include('partials/header', { currentPage: 'matches' }) %>
 
+<style>
+/* ── Inline prediction form ─────────────────────────────────────────────────── */
+.predict-form {
+  border-top: 1px solid var(--border);
+  padding: 12px 16px 14px;
+  background: rgba(0,0,0,.18);
+  border-radius: 0 0 12px 12px;
+}
+.predict-opts {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 8px;
+  flex-wrap: wrap;
+}
+.predict-opt input[type="radio"] { display: none; }
+.predict-opt label {
+  flex: 1;
+  min-width: 0;
+  text-align: center;
+  padding: 8px 6px;
+  border: 1.5px solid var(--border);
+  border-radius: 8px;
+  cursor: pointer;
+  font-size: .82rem;
+  font-weight: 600;
+  color: var(--text-dim);
+  transition: all .15s;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  display: block;
+}
+.predict-opt input[type="radio"]:checked + label,
+.predict-opt label.pre-selected {
+  border-color: var(--accent);
+  background: rgba(59,130,246,.15);
+  color: var(--text);
+}
+.predict-opt label:hover { border-color: var(--accent); color: var(--text); }
+.predict-aet {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 8px;
+  font-size: .8rem;
+  color: var(--text-dim);
+}
+.predict-aet input[type="radio"] { display: none; }
+.predict-aet label {
+  padding: 5px 14px;
+  border: 1.5px solid var(--border);
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: .8rem;
+  color: var(--text-dim);
+  transition: all .15s;
+}
+.predict-aet input[type="radio"]:checked + label {
+  border-color: var(--gold);
+  background: rgba(251,191,36,.12);
+  color: var(--gold);
+}
+.predict-aet label:hover { border-color: var(--gold); }
+.predict-save-btn {
+  width: 100%;
+  margin-top: 4px;
+  padding: 9px;
+  font-size: .88rem;
+}
+.saved-pred-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+</style>
+
 <div class="page">
   <div class="container">
 
@@ -9,22 +86,22 @@
     <div class="section-header">
       <div>
         <div class="section-title">⚽ Match Predictions</div>
-        <div class="section-subtitle"><%= matches.length %> matches shown · All times in Kuwait Time</div>
+        <div class="section-subtitle"><%= matches.length %> matches · All times in Kuwait Time (KWT)</div>
       </div>
     </div>
 
-    <!-- Filters -->
+    <!-- Round filters -->
     <div class="tabs mb-16">
-      <a href="/matches" class="tab-btn <%= !filter.round && !filter.group ? 'active' : '' %>">All Matches</a>
-      <a href="/matches?round=group" class="tab-btn <%= filter.round === 'group' ? 'active' : '' %>">Group Stage</a>
-      <a href="/matches?round=r32"   class="tab-btn <%= filter.round === 'r32'   ? 'active' : '' %>">Round of 32</a>
-      <a href="/matches?round=r16"   class="tab-btn <%= filter.round === 'r16'   ? 'active' : '' %>">Round of 16</a>
-      <a href="/matches?round=qf"    class="tab-btn <%= filter.round === 'qf'    ? 'active' : '' %>">Quarterfinals</a>
-      <a href="/matches?round=sf"    class="tab-btn <%= filter.round === 'sf'    ? 'active' : '' %>">Semifinals</a>
-      <a href="/matches?round=final" class="tab-btn <%= filter.round === 'final' ? 'active' : '' %>">Final</a>
+      <a href="/matches"              class="tab-btn <%= !filter.round && !filter.group ? 'active' : '' %>">All</a>
+      <a href="/matches?round=group"  class="tab-btn <%= filter.round === 'group' ? 'active' : '' %>">Groups</a>
+      <a href="/matches?round=r32"    class="tab-btn <%= filter.round === 'r32'   ? 'active' : '' %>">R32</a>
+      <a href="/matches?round=r16"    class="tab-btn <%= filter.round === 'r16'   ? 'active' : '' %>">R16</a>
+      <a href="/matches?round=qf"     class="tab-btn <%= filter.round === 'qf'    ? 'active' : '' %>">QF</a>
+      <a href="/matches?round=sf"     class="tab-btn <%= filter.round === 'sf'    ? 'active' : '' %>">SF</a>
+      <a href="/matches?round=final"  class="tab-btn <%= filter.round === 'final' ? 'active' : '' %>">Final</a>
     </div>
 
-    <!-- Group filter (shown in group view) -->
+    <!-- Group sub-filter -->
     <% if (!filter.round || filter.round === 'group') { %>
     <div class="lb-filters mb-16">
       <a href="/matches?round=group" class="lb-filter-btn <%= filter.round === 'group' && !filter.group ? 'active' : '' %>">All Groups</a>
@@ -40,6 +117,10 @@
         <p class="text-muted">No matches found for this filter.</p>
       </div>
     <% } else { %>
+
+    <!-- Build returnTo for inline forms -->
+    <% const returnTo = '/matches' + (filter.round ? '?round='+filter.round : (filter.group ? '?group='+filter.group : '')); %>
+
     <div class="matches-grid">
       <% matches.forEach(m => { %>
       <%
@@ -50,7 +131,7 @@
           cardClass = 'locked';
         }
       %>
-      <div class="match-card <%= cardClass %>">
+      <div class="match-card <%= cardClass %>" id="card-<%= m.id %>">
         <div class="match-header">
           <div style="display:flex;align-items:center;gap:8px">
             <% if (m.group_name) { %>
@@ -58,9 +139,9 @@
             <% } else { %>
               <span class="match-round-badge knockout"><%= m.round.toUpperCase() %></span>
             <% } %>
-            <span style="color:var(--text-dim);font-size:.78rem"><%= m.city %></span>
+            <span style="color:var(--text-dim);font-size:.75rem"><%= m.stadium %></span>
           </div>
-          <span style="font-size:.78rem;color:var(--text-dim)">⏰ <%= m.match_time_kwt %></span>
+          <span style="font-size:.75rem;color:var(--text-dim)">⏰ <%= m.match_time_kwt %></span>
         </div>
 
         <div class="match-body">
@@ -71,8 +152,8 @@
             </div>
             <% if (m.result) { %>
               <div class="result-badge">
-                <%= m.result === 'draw' ? 'Draw' : (m.result === 'team_a' ? m.team_a.split(' ')[0] : m.team_b.split(' ')[0]) %>
-                <% if (m.aet_result === 'aet') { %><div style="font-size:.65rem;margin-top:2px;color:var(--text-dim)">AET</div><% } %>
+                <% if (m.result === 'draw') { %>🤝<% } else { %><%= m.result === 'team_a' ? m.team_a.split(' ')[0] : m.team_b.split(' ')[0] %><% } %>
+                <% if (m.aet_result === 'aet') { %><div style="font-size:.62rem;margin-top:2px;color:var(--text-dim)">AET</div><% } %>
               </div>
             <% } else { %>
               <div class="vs-badge">vs</div>
@@ -85,7 +166,7 @@
 
           <div class="match-actions">
             <% if (m.result) { %>
-              <!-- Result in -->
+              <%/* ── Result is in ── */%>
               <% if (m.prediction) { %>
                 <% if (m.pts.main > 0) { %>
                   <span class="prediction-pill correct">✅ +<%= m.pts.main + m.pts.bonus %> pts</span>
@@ -96,30 +177,101 @@
               <% } else { %>
                 <span class="prediction-pill locked">No prediction</span>
               <% } %>
+
             <% } else if (m.is_locked) { %>
+              <%/* ── Locked, no result yet ── */%>
               <span class="prediction-pill locked">🔒 Locked</span>
               <% if (m.prediction) { %>
-                <span class="prediction-pill saved" style="font-size:.72rem">
-                  <%= m.prediction === 'team_a' ? m.team_a : (m.prediction === 'draw' ? 'Draw' : m.team_b) %>
+                <span class="prediction-pill saved" style="font-size:.75rem">
+                  <%= m.prediction === 'team_a' ? m.team_a : (m.prediction === 'draw' ? '🤝 Draw' : m.team_b) %>
+                  <% if (m.aet_prediction) { %> · <%= m.aet_prediction === '90min' ? '90min' : 'AET' %><% } %>
                 </span>
               <% } %>
+
             <% } else { %>
-              <% if (m.prediction) { %>
-                <span class="prediction-pill saved">
-                  <%= m.prediction === 'team_a' ? m.team_a : (m.prediction === 'draw' ? 'Draw' : m.team_b) %>
-                </span>
-                <a href="/matches/<%= m.id %>" class="btn btn-secondary btn-sm">Edit</a>
-              <% } else { %>
-                <a href="/matches/<%= m.id %>" class="btn btn-primary btn-sm">Predict →</a>
-              <% } %>
+              <%/* ── Open for prediction ── */%>
+              <div class="saved-pred-row">
+                <% if (m.prediction) { %>
+                  <span class="prediction-pill saved">
+                    <%= m.prediction === 'team_a' ? m.team_a : (m.prediction === 'draw' ? '🤝 Draw' : m.team_b) %>
+                    <% if (m.aet_prediction) { %> · <%= m.aet_prediction === '90min' ? '90min' : 'AET' %><% } %>
+                  </span>
+                  <button class="btn btn-secondary btn-sm" onclick="togglePredictForm('<%= m.id %>')">✏️ Edit</button>
+                <% } else { %>
+                  <button class="btn btn-primary btn-sm" onclick="togglePredictForm('<%= m.id %>')">⚽ Predict</button>
+                <% } %>
+              </div>
             <% } %>
           </div>
         </div>
+
+        <%/* ── Inline prediction form (only for open matches) ── */%>
+        <% if (!m.result && !m.is_locked) { %>
+        <div id="predict-form-<%= m.id %>" class="predict-form" style="display:none">
+          <form method="POST" action="/matches/<%= m.id %>/predict">
+            <input type="hidden" name="_returnTo" value="<%= returnTo %>">
+
+            <div class="predict-opts">
+              <div class="predict-opt">
+                <input type="radio" id="pa_<%= m.id %>" name="prediction" value="team_a"
+                       <%= m.prediction === 'team_a' ? 'checked' : '' %> required>
+                <label for="pa_<%= m.id %>" title="<%= m.team_a %>"><%= m.team_a %></label>
+              </div>
+              <% if (!m.is_knockout) { %>
+              <div class="predict-opt">
+                <input type="radio" id="pd_<%= m.id %>" name="prediction" value="draw"
+                       <%= m.prediction === 'draw' ? 'checked' : '' %>>
+                <label for="pd_<%= m.id %>">🤝 Draw</label>
+              </div>
+              <% } %>
+              <div class="predict-opt">
+                <input type="radio" id="pb_<%= m.id %>" name="prediction" value="team_b"
+                       <%= m.prediction === 'team_b' ? 'checked' : '' %>>
+                <label for="pb_<%= m.id %>" title="<%= m.team_b %>"><%= m.team_b %></label>
+              </div>
+            </div>
+
+            <% if (m.is_knockout) { %>
+            <div class="predict-aet">
+              <span>Decided in:</span>
+              <div>
+                <input type="radio" id="a90_<%= m.id %>" name="aet_prediction" value="90min"
+                       <%= m.aet_prediction === '90min' ? 'checked' : '' %> required>
+                <label for="a90_<%= m.id %>">90 min</label>
+              </div>
+              <div>
+                <input type="radio" id="aet_<%= m.id %>" name="aet_prediction" value="aet"
+                       <%= m.aet_prediction === 'aet' ? 'checked' : '' %>>
+                <label for="aet_<%= m.id %>">AET / Pens</label>
+              </div>
+            </div>
+            <% } %>
+
+            <button type="submit" class="btn btn-primary predict-save-btn">💾 Save Prediction</button>
+          </form>
+        </div>
+        <% } %>
+
       </div>
       <% }) %>
     </div>
     <% } %>
   </div>
 </div>
+
+<script>
+function togglePredictForm(id) {
+  const form = document.getElementById('predict-form-' + id);
+  if (!form) return;
+  const isOpen = form.style.display !== 'none';
+  // Close all others
+  document.querySelectorAll('.predict-form').forEach(f => f.style.display = 'none');
+  // Toggle this one
+  if (!isOpen) {
+    form.style.display = 'block';
+    form.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+  }
+}
+</script>
 
 <%- include('partials/footer') %>

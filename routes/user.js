@@ -58,7 +58,7 @@ router.get('/dashboard', requireLogin, (req, res) => {
   `).get(userId).pts;
   totalPts += awardPts;
 
-  // Rank
+  // Rank + full leaderboard for dashboard
   const { computeLeaderboard } = require('../db/database');
   const lb = computeLeaderboard(db);
   const myRank = lb.find(r => r.id === userId)?.rank || '-';
@@ -71,7 +71,8 @@ router.get('/dashboard', requireLogin, (req, res) => {
       const pts = calculateMatchPoints(m, { result: m.result, aet_result: m.aet_result }, m);
       return { ...m, match_time_kwt: toKuwaitTimeShort(m.match_time), pts };
     }),
-    stats: { totalPts, groupPts, knockoutPts, bonusPts, awardPts, correct, rank: myRank, totalUsers }
+    stats: { totalPts, groupPts, knockoutPts, bonusPts, awardPts, correct, rank: myRank, totalUsers },
+    leaderboard: lb
   });
 });
 
@@ -161,35 +162,37 @@ router.post('/matches/:id/predict', requireLogin, (req, res) => {
     req.session.flashError = 'Match not found.';
     return res.redirect('/matches');
   }
+  const returnTo = req.body._returnTo || '/matches';
+
   if (match.is_locked) {
     req.session.flashError = 'Predictions are locked for this match.';
-    return res.redirect(`/matches/${matchId}`);
+    return res.redirect(returnTo);
   }
 
   // Check if result already in
   const result = db.prepare('SELECT id FROM results WHERE match_id = ?').get(matchId);
   if (result) {
     req.session.flashError = 'This match has already been played.';
-    return res.redirect(`/matches/${matchId}`);
+    return res.redirect(returnTo);
   }
 
   const { prediction, aet_prediction } = req.body;
   const validPreds = ['team_a', 'draw', 'team_b'];
   if (!validPreds.includes(prediction)) {
     req.session.flashError = 'Invalid prediction. Please select a valid option.';
-    return res.redirect(`/matches/${matchId}`);
+    return res.redirect(returnTo);
   }
 
   // For knockout, draw not allowed
   if (match.is_knockout && prediction === 'draw') {
     req.session.flashError = 'Draw is not allowed in knockout rounds.';
-    return res.redirect(`/matches/${matchId}`);
+    return res.redirect(returnTo);
   }
 
   // For knockout, aet_prediction required
   if (match.is_knockout && !['90min', 'aet'].includes(aet_prediction)) {
     req.session.flashError = 'Please select whether the match ends in 90 minutes or AET.';
-    return res.redirect(`/matches/${matchId}`);
+    return res.redirect(returnTo);
   }
 
   db.prepare(`
@@ -202,7 +205,7 @@ router.post('/matches/:id/predict', requireLogin, (req, res) => {
   `).run(userId, matchId, prediction, match.is_knockout ? aet_prediction : null);
 
   req.session.flashSuccess = '✅ Prediction saved!';
-  res.redirect(`/matches/${matchId}`);
+  res.redirect(returnTo);
 });
 
 // ── Rules ─────────────────────────────────────────────────────────────────────

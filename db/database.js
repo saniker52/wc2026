@@ -5,6 +5,9 @@ const path = require('path');
 const DB_DIR = process.env.DB_PATH || __dirname;
 const DB_PATH = path.join(DB_DIR, 'wc2026.db');
 
+// Increment this to force a fixture re-seed on next startup
+const DB_VERSION = 2;
+
 let db;
 
 function getDb() {
@@ -122,6 +125,11 @@ function initSchema() {
 }
 
 function seedInitialData() {
+  // ── Version / migration table ──────────────────────────────────────────────
+  db.exec(`CREATE TABLE IF NOT EXISTS db_meta (key TEXT PRIMARY KEY, value TEXT)`);
+  const versionRow = db.prepare(`SELECT value FROM db_meta WHERE key='version'`).get();
+  const currentVersion = versionRow ? parseInt(versionRow.value) : 0;
+
   // ── Admin user ─────────────────────────────────────────────────────────────
   const adminExists = db.prepare('SELECT id FROM users WHERE username = ?').get('admin');
   if (!adminExists) {
@@ -139,177 +147,185 @@ function seedInitialData() {
       'INSERT INTO award_categories (name, points, sort_order) VALUES (?, 10, ?)'
     );
     const categories = [
-      'Top Goalscorer',
+      'Top Goalscorer (Golden Boot)',
       'Best Player (Golden Ball)',
       'Best Young Player',
       'Best Goalkeeper (Golden Glove)',
-      'Fair Play Award'
+      'Tournament Winner'
     ];
     categories.forEach((name, i) => insertCat.run(name, i));
     console.log('✅ Award categories seeded');
   }
 
-  // ── WC 2026 Group Stage Fixtures ───────────────────────────────────────────
-  // 48 teams, 12 groups (A–L), 4 teams each, 6 matches per group = 72 total
-  // Times stored in UTC (Kuwait is UTC+3, so midnight KWT = 21:00 UTC prev day)
-  const matchesExist = db.prepare('SELECT id FROM matches LIMIT 1').get();
-  if (!matchesExist) {
+  // ── Fixture migration ──────────────────────────────────────────────────────
+  if (currentVersion < DB_VERSION) {
+    console.log(`⚙️  Migrating fixtures to v${DB_VERSION}...`);
+    db.exec(`DELETE FROM predictions`);
+    db.exec(`DELETE FROM results`);
+    db.exec(`DELETE FROM matches`);
     seedMatches();
+    db.prepare(`INSERT OR REPLACE INTO db_meta (key, value) VALUES ('version', ?)`).run(String(DB_VERSION));
+    console.log(`✅ Fixtures migrated to v${DB_VERSION}`);
   }
 }
 
 function seedMatches() {
-  const insertMatch = db.prepare(`
+  const ins = db.prepare(`
     INSERT INTO matches (round, group_name, match_num, team_a, team_b, match_time, stadium, city, is_knockout, is_locked)
     VALUES (@round, @group_name, @match_num, @team_a, @team_b, @match_time, @stadium, @city, @is_knockout, @is_locked)
   `);
 
-  // ── FIFA WC 2026 Groups ────────────────────────────────────────────────────
-  // (Groups confirmed after the Dec 2025 draw)
-  const groups = {
-    A: ['Mexico', 'Uruguay', 'Cameroon', 'Tunisia'],
-    B: ['USA', 'Panama', 'Qatar', 'New Zealand'],
-    C: ['Canada', 'Morocco', 'Croatia', 'Belgium'],
-    D: ['Argentina', 'Chile', 'Saudi Arabia', 'Albania'],
-    E: ['Spain', 'Ukraine', 'Serbia', 'Algeria'],
-    F: ['Portugal', 'Czech Republic', 'Nigeria', 'Egypt'],
-    G: ['Brazil', 'Colombia', 'Venezuela', 'South Korea'],
-    H: ['England', 'Senegal', 'Slovakia', 'Paraguay'],
-    I: ['France', 'Australia', 'Cameroon', 'Guatemala'],
-    J: ['Germany', 'Switzerland', 'Italy', 'Iran'],
-    K: ['Netherlands', 'Poland', 'Congo DR', 'Peru'],
-    L: ['Japan', 'Ecuador', 'Burkina Faso', 'Costa Rica']
-  };
-
-  // Generate group stage matches for each group
-  // Each group: match1 (T1vT2), match2 (T3vT4), match3 (T1vT3), match4 (T2vT4), match5 (T1vT4), match6 (T2vT3)
-  const groupMatchups = [
-    [0, 1], [2, 3],
-    [0, 2], [1, 3],
-    [0, 3], [1, 2]
-  ];
-
-  // Base date: June 11, 2026 (tournament start), in UTC
-  const baseDate = new Date('2026-06-11T18:00:00Z'); // 9pm KWT = 18:00 UTC
-
-  const groupKeys = Object.keys(groups);
-  let matchNum = 1;
-
-  // Assign dates: 6 match days for group stage round 1–3 (2 rounds × 6 days each = 12 group-stage days)
-  // Simplified: spread 72 matches across 18 days (Jun 11 – Jun 28)
-  const seedTx = db.transaction(() => {
-    groupKeys.forEach((grp, gi) => {
-      const teams = groups[grp];
-      groupMatchups.forEach(([a, b], mi) => {
-        // Spread matches: first 2 matchdays (mi 0,1), second 2 (mi 2,3), third 2 (mi 4,5)
-        const dayOffset = Math.floor(mi / 2) * 6 + Math.floor(gi / 2);
-        const hourOffset = (gi % 2) * 3; // 18:00 or 21:00 UTC
-        const matchTime = new Date(baseDate);
-        matchTime.setDate(matchTime.getDate() + dayOffset);
-        matchTime.setHours(18 + hourOffset);
-
-        insertMatch.run({
-          round: 'group',
-          group_name: grp,
-          match_num: matchNum++,
-          team_a: teams[a],
-          team_b: teams[b],
-          match_time: matchTime.toISOString(),
-          stadium: 'TBC',
-          city: 'USA / Canada / Mexico',
-          is_knockout: 0,
-          is_locked: 0
-        });
-      });
-    });
-
-    // ── Round of 32 ──────────────────────────────────────────────────────────
-    const r32Start = new Date('2026-07-01T18:00:00Z');
-    const r32Matchups = [
-      ['1A', '2C'], ['1C', '2A'], ['1B', '2D'], ['1D', '2B'],
-      ['1E', '2G'], ['1G', '2E'], ['1F', '2H'], ['1H', '2F'],
-      ['1I', '2K'], ['1K', '2I'], ['1J', '2L'], ['1L', '2J'],
-      ['Best 3rd #1', 'Best 3rd #2'], ['Best 3rd #3', 'Best 3rd #4'],
-      ['Best 3rd #5', 'Best 3rd #6'], ['Best 3rd #7', 'Best 3rd #8']
-    ];
-    r32Matchups.forEach(([a, b], i) => {
-      const d = new Date(r32Start);
-      d.setDate(d.getDate() + Math.floor(i / 4));
-      d.setHours(18 + (i % 4 < 2 ? 0 : 3));
-      insertMatch.run({
-        round: 'r32', group_name: null, match_num: i + 1,
-        team_a: a, team_b: b,
-        match_time: d.toISOString(),
-        stadium: 'TBC', city: 'USA / Canada / Mexico',
-        is_knockout: 1, is_locked: 0
-      });
-    });
-
-    // ── Round of 16 ──────────────────────────────────────────────────────────
-    const r16Start = new Date('2026-07-05T18:00:00Z');
-    for (let i = 0; i < 8; i++) {
-      const d = new Date(r16Start);
-      d.setDate(d.getDate() + Math.floor(i / 2));
-      d.setHours(i % 2 === 0 ? 18 : 21);
-      insertMatch.run({
-        round: 'r16', group_name: null, match_num: i + 1,
-        team_a: `R32 Winner ${i * 2 + 1}`, team_b: `R32 Winner ${i * 2 + 2}`,
-        match_time: d.toISOString(),
-        stadium: 'TBC', city: 'USA / Canada / Mexico',
-        is_knockout: 1, is_locked: 0
-      });
-    }
-
-    // ── Quarter-finals ────────────────────────────────────────────────────────
-    const qfStart = new Date('2026-07-09T18:00:00Z');
-    for (let i = 0; i < 4; i++) {
-      const d = new Date(qfStart);
-      d.setDate(d.getDate() + Math.floor(i / 2));
-      d.setHours(i % 2 === 0 ? 18 : 21);
-      insertMatch.run({
-        round: 'qf', group_name: null, match_num: i + 1,
-        team_a: `R16 Winner ${i * 2 + 1}`, team_b: `R16 Winner ${i * 2 + 2}`,
-        match_time: d.toISOString(),
-        stadium: 'TBC', city: 'USA / Canada / Mexico',
-        is_knockout: 1, is_locked: 0
-      });
-    }
-
-    // ── Semi-finals ───────────────────────────────────────────────────────────
-    const sfStart = new Date('2026-07-14T18:00:00Z');
-    for (let i = 0; i < 2; i++) {
-      const d = new Date(sfStart);
-      d.setDate(d.getDate() + i);
-      insertMatch.run({
-        round: 'sf', group_name: null, match_num: i + 1,
-        team_a: `QF Winner ${i * 2 + 1}`, team_b: `QF Winner ${i * 2 + 2}`,
-        match_time: d.toISOString(),
-        stadium: 'MetLife Stadium', city: 'East Rutherford, NJ',
-        is_knockout: 1, is_locked: 0
-      });
-    }
-
-    // ── Third place match ─────────────────────────────────────────────────────
-    insertMatch.run({
-      round: '3rd', group_name: null, match_num: 1,
-      team_a: 'SF Loser 1', team_b: 'SF Loser 2',
-      match_time: '2026-07-18T18:00:00Z',
-      stadium: 'Hard Rock Stadium', city: 'Miami, FL',
-      is_knockout: 1, is_locked: 0
-    });
-
-    // ── Final ──────────────────────────────────────────────────────────────────
-    insertMatch.run({
-      round: 'final', group_name: null, match_num: 1,
-      team_a: 'SF Winner 1', team_b: 'SF Winner 2',
-      match_time: '2026-07-19T18:00:00Z',
-      stadium: 'MetLife Stadium', city: 'East Rutherford, NJ',
-      is_knockout: 1, is_locked: 0
-    });
+  // Helper – all times in UTC (EDT = UTC-4 during June/July)
+  const gm = (num, grp, a, b, utc, stadium, city) => ({
+    round: 'group', group_name: grp, match_num: num,
+    team_a: a, team_b: b, match_time: utc,
+    stadium, city, is_knockout: 0, is_locked: 0
+  });
+  const km = (round, num, a, b, utc, stadium, city) => ({
+    round, group_name: null, match_num: num,
+    team_a: a, team_b: b, match_time: utc,
+    stadium, city, is_knockout: 1, is_locked: 0
   });
 
+  // ── Official FIFA WC 2026 fixtures ─────────────────────────────────────────
+  // Group stage: 72 matches across 12 groups (A–L), ordered chronologically
+  // All times stored in UTC. EDT (Jun–Jul) = UTC−4, so 3 PM ET = 19:00 UTC etc.
+  const fixtures = [
+    // ── GROUP A: 🇲🇽 Mexico · 🇨🇿 Czechia · 🇰🇷 South Korea · 🇿🇦 South Africa ─
+    gm( 1,'A','🇲🇽 Mexico',      '🇿🇦 South Africa', '2026-06-11T19:00:00Z', 'Estadio Azteca',          'Mexico City, Mexico'),
+    gm( 2,'A','🇰🇷 South Korea', '🇨🇿 Czechia',       '2026-06-12T01:00:00Z', 'Estadio Akron',           'Zapopan, Mexico'),
+    gm( 3,'A','🇨🇿 Czechia',     '🇿🇦 South Africa', '2026-06-18T16:00:00Z', 'Mercedes-Benz Stadium',   'Atlanta, GA'),
+    gm( 4,'A','🇲🇽 Mexico',      '🇰🇷 South Korea',  '2026-06-19T01:00:00Z', 'Estadio Akron',           'Zapopan, Mexico'),
+    gm( 5,'A','🇨🇿 Czechia',     '🇲🇽 Mexico',       '2026-06-25T01:00:00Z', 'Estadio Azteca',          'Mexico City, Mexico'),
+    gm( 6,'A','🇿🇦 South Africa','🇰🇷 South Korea',  '2026-06-25T01:00:00Z', 'Estadio BBVA',            'Monterrey, Mexico'),
+    // ── GROUP B: 🇨🇦 Canada · 🇨🇭 Switzerland · 🇧🇦 Bosnia & Herz. · 🇶🇦 Qatar ──
+    gm( 7,'B','🇨🇦 Canada',      '🇧🇦 Bosnia & Herz.','2026-06-12T19:00:00Z', 'BMO Field',               'Toronto, Canada'),
+    gm( 8,'B','🇶🇦 Qatar',       '🇨🇭 Switzerland',  '2026-06-13T19:00:00Z', "Levi's Stadium",          'Santa Clara, CA'),
+    gm( 9,'B','🇨🇭 Switzerland', '🇧🇦 Bosnia & Herz.','2026-06-18T19:00:00Z', 'SoFi Stadium',            'Inglewood, CA'),
+    gm(10,'B','🇨🇦 Canada',      '🇶🇦 Qatar',         '2026-06-18T22:00:00Z', 'BC Place',                'Vancouver, Canada'),
+    gm(11,'B','🇨🇭 Switzerland', '🇨🇦 Canada',        '2026-06-24T19:00:00Z', 'BC Place',                'Vancouver, Canada'),
+    gm(12,'B','🇧🇦 Bosnia & Herz.','🇶🇦 Qatar',       '2026-06-24T19:00:00Z', 'Lumen Field',             'Seattle, WA'),
+    // ── GROUP C: 🇧🇷 Brazil · 🏴󠁧󠁢󠁳󠁣󠁴󠁿 Scotland · 🇲🇦 Morocco · 🇭🇹 Haiti ────────────
+    gm(13,'C','🇧🇷 Brazil',      '🇲🇦 Morocco',       '2026-06-13T22:00:00Z', 'MetLife Stadium',         'East Rutherford, NJ'),
+    gm(14,'C','🇭🇹 Haiti',       '🏴󠁧󠁢󠁳󠁣󠁴󠁿 Scotland',    '2026-06-14T01:00:00Z', 'Gillette Stadium',        'Foxborough, MA'),
+    gm(15,'C','🏴󠁧󠁢󠁳󠁣󠁴󠁿 Scotland',   '🇲🇦 Morocco',       '2026-06-19T22:00:00Z', 'Gillette Stadium',        'Foxborough, MA'),
+    gm(16,'C','🇧🇷 Brazil',      '🇭🇹 Haiti',         '2026-06-20T00:30:00Z', 'Lincoln Financial Field', 'Philadelphia, PA'),
+    gm(17,'C','🏴󠁧󠁢󠁳󠁣󠁴󠁿 Scotland',   '🇧🇷 Brazil',        '2026-06-24T22:00:00Z', 'Hard Rock Stadium',       'Miami Gardens, FL'),
+    gm(18,'C','🇲🇦 Morocco',     '🇭🇹 Haiti',         '2026-06-24T22:00:00Z', 'Mercedes-Benz Stadium',   'Atlanta, GA'),
+    // ── GROUP D: 🇺🇸 USA · 🇦🇺 Australia · 🇹🇷 Türkiye · 🇵🇾 Paraguay ───────────
+    gm(19,'D','🇺🇸 USA',         '🇵🇾 Paraguay',      '2026-06-13T01:00:00Z', 'SoFi Stadium',            'Inglewood, CA'),
+    gm(20,'D','🇦🇺 Australia',   '🇹🇷 Türkiye',       '2026-06-14T16:00:00Z', 'BC Place',                'Vancouver, Canada'),
+    gm(21,'D','🇺🇸 USA',         '🇦🇺 Australia',     '2026-06-19T19:00:00Z', 'Lumen Field',             'Seattle, WA'),
+    gm(22,'D','🇹🇷 Türkiye',     '🇵🇾 Paraguay',      '2026-06-20T03:00:00Z', "Levi's Stadium",          'Santa Clara, CA'),
+    gm(23,'D','🇹🇷 Türkiye',     '🇺🇸 USA',           '2026-06-26T02:00:00Z', 'SoFi Stadium',            'Inglewood, CA'),
+    gm(24,'D','🇵🇾 Paraguay',    '🇦🇺 Australia',     '2026-06-26T02:00:00Z', "Levi's Stadium",          'Santa Clara, CA'),
+    // ── GROUP E: 🇩🇪 Germany · 🇨🇮 Ivory Coast · 🇪🇨 Ecuador · 🇨🇼 Curaçao ──────
+    gm(25,'E','🇩🇪 Germany',     '🇨🇼 Curaçao',       '2026-06-14T19:00:00Z', 'NRG Stadium',             'Houston, TX'),
+    gm(26,'E','🇨🇮 Ivory Coast', '🇪🇨 Ecuador',       '2026-06-15T01:00:00Z', 'Lincoln Financial Field', 'Philadelphia, PA'),
+    gm(27,'E','🇩🇪 Germany',     '🇨🇮 Ivory Coast',   '2026-06-20T20:00:00Z', 'BMO Field',               'Toronto, Canada'),
+    gm(28,'E','🇪🇨 Ecuador',     '🇨🇼 Curaçao',       '2026-06-21T00:00:00Z', 'Arrowhead Stadium',       'Kansas City, MO'),
+    gm(29,'E','🇨🇼 Curaçao',     '🇨🇮 Ivory Coast',   '2026-06-25T20:00:00Z', 'Lincoln Financial Field', 'Philadelphia, PA'),
+    gm(30,'E','🇪🇨 Ecuador',     '🇩🇪 Germany',       '2026-06-25T20:00:00Z', 'MetLife Stadium',         'East Rutherford, NJ'),
+    // ── GROUP F: 🇳🇱 Netherlands · 🇸🇪 Sweden · 🇯🇵 Japan · 🇹🇳 Tunisia ───────────
+    gm(31,'F','🇳🇱 Netherlands', '🇯🇵 Japan',         '2026-06-14T22:00:00Z', 'AT&T Stadium',            'Arlington, TX'),
+    gm(32,'F','🇸🇪 Sweden',      '🇹🇳 Tunisia',       '2026-06-15T03:00:00Z', 'Estadio BBVA',            'Monterrey, Mexico'),
+    gm(33,'F','🇳🇱 Netherlands', '🇸🇪 Sweden',        '2026-06-20T17:00:00Z', 'NRG Stadium',             'Houston, TX'),
+    gm(34,'F','🇹🇳 Tunisia',     '🇯🇵 Japan',         '2026-06-21T04:00:00Z', 'Estadio BBVA',            'Monterrey, Mexico'),
+    gm(35,'F','🇯🇵 Japan',       '🇸🇪 Sweden',        '2026-06-25T23:00:00Z', 'AT&T Stadium',            'Arlington, TX'),
+    gm(36,'F','🇹🇳 Tunisia',     '🇳🇱 Netherlands',   '2026-06-25T23:00:00Z', 'Arrowhead Stadium',       'Kansas City, MO'),
+    // ── GROUP G: 🇧🇪 Belgium · 🇮🇷 Iran · 🇳🇿 New Zealand · 🇪🇬 Egypt ─────────────
+    gm(37,'G','🇧🇪 Belgium',     '🇪🇬 Egypt',         '2026-06-15T19:00:00Z', 'Lumen Field',             'Seattle, WA'),
+    gm(38,'G','🇮🇷 Iran',        '🇳🇿 New Zealand',   '2026-06-16T01:00:00Z', 'SoFi Stadium',            'Inglewood, CA'),
+    gm(39,'G','🇧🇪 Belgium',     '🇮🇷 Iran',          '2026-06-21T19:00:00Z', 'SoFi Stadium',            'Inglewood, CA'),
+    gm(40,'G','🇳🇿 New Zealand', '🇪🇬 Egypt',         '2026-06-22T01:00:00Z', 'BC Place',                'Vancouver, Canada'),
+    gm(41,'G','🇪🇬 Egypt',       '🇮🇷 Iran',          '2026-06-27T03:00:00Z', 'Lumen Field',             'Seattle, WA'),
+    gm(42,'G','🇳🇿 New Zealand', '🇧🇪 Belgium',       '2026-06-27T03:00:00Z', 'BC Place',                'Vancouver, Canada'),
+    // ── GROUP H: 🇪🇸 Spain · 🇸🇦 Saudi Arabia · 🇺🇾 Uruguay · 🇨🇻 Cape Verde ──────
+    gm(43,'H','🇪🇸 Spain',       '🇨🇻 Cape Verde',    '2026-06-15T16:00:00Z', 'Mercedes-Benz Stadium',   'Atlanta, GA'),
+    gm(44,'H','🇸🇦 Saudi Arabia','🇺🇾 Uruguay',        '2026-06-15T22:00:00Z', 'Hard Rock Stadium',       'Miami Gardens, FL'),
+    gm(45,'H','🇪🇸 Spain',       '🇸🇦 Saudi Arabia',  '2026-06-21T16:00:00Z', 'Mercedes-Benz Stadium',   'Atlanta, GA'),
+    gm(46,'H','🇺🇾 Uruguay',     '🇨🇻 Cape Verde',    '2026-06-21T22:00:00Z', 'Hard Rock Stadium',       'Miami Gardens, FL'),
+    gm(47,'H','🇨🇻 Cape Verde',  '🇸🇦 Saudi Arabia',  '2026-06-27T00:00:00Z', 'NRG Stadium',             'Houston, TX'),
+    gm(48,'H','🇺🇾 Uruguay',     '🇪🇸 Spain',         '2026-06-27T00:00:00Z', 'Estadio Akron',           'Zapopan, Mexico'),
+    // ── GROUP I: 🇫🇷 France · 🇳🇴 Norway · 🇸🇳 Senegal · 🇮🇶 Iraq ────────────────
+    gm(49,'I','🇫🇷 France',      '🇸🇳 Senegal',       '2026-06-16T19:00:00Z', 'MetLife Stadium',         'East Rutherford, NJ'),
+    gm(50,'I','🇮🇶 Iraq',        '🇳🇴 Norway',        '2026-06-16T22:00:00Z', 'Gillette Stadium',        'Foxborough, MA'),
+    gm(51,'I','🇫🇷 France',      '🇮🇶 Iraq',          '2026-06-22T21:00:00Z', 'Lincoln Financial Field', 'Philadelphia, PA'),
+    gm(52,'I','🇳🇴 Norway',      '🇸🇳 Senegal',       '2026-06-23T00:00:00Z', 'MetLife Stadium',         'East Rutherford, NJ'),
+    gm(53,'I','🇳🇴 Norway',      '🇫🇷 France',        '2026-06-26T19:00:00Z', 'Gillette Stadium',        'Foxborough, MA'),
+    gm(54,'I','🇸🇳 Senegal',     '🇮🇶 Iraq',          '2026-06-26T19:00:00Z', 'BMO Field',               'Toronto, Canada'),
+    // ── GROUP J: 🇦🇷 Argentina · 🇦🇹 Austria · 🇯🇴 Jordan · 🇩🇿 Algeria ──────────
+    gm(55,'J','🇦🇷 Argentina',   '🇩🇿 Algeria',       '2026-06-17T01:00:00Z', 'Arrowhead Stadium',       'Kansas City, MO'),
+    gm(56,'J','🇦🇹 Austria',     '🇯🇴 Jordan',        '2026-06-17T16:00:00Z', "Levi's Stadium",          'Santa Clara, CA'),
+    gm(57,'J','🇦🇷 Argentina',   '🇦🇹 Austria',       '2026-06-22T17:00:00Z', 'AT&T Stadium',            'Arlington, TX'),
+    gm(58,'J','🇯🇴 Jordan',      '🇩🇿 Algeria',       '2026-06-23T03:00:00Z', "Levi's Stadium",          'Santa Clara, CA'),
+    gm(59,'J','🇩🇿 Algeria',     '🇦🇹 Austria',       '2026-06-28T02:00:00Z', 'Arrowhead Stadium',       'Kansas City, MO'),
+    gm(60,'J','🇯🇴 Jordan',      '🇦🇷 Argentina',     '2026-06-28T02:00:00Z', 'AT&T Stadium',            'Arlington, TX'),
+    // ── GROUP K: 🇵🇹 Portugal · 🇨🇴 Colombia · 🇺🇿 Uzbekistan · 🇨🇩 DR Congo ──────
+    gm(61,'K','🇵🇹 Portugal',    '🇨🇩 DR Congo',      '2026-06-17T19:00:00Z', 'NRG Stadium',             'Houston, TX'),
+    gm(62,'K','🇺🇿 Uzbekistan',  '🇨🇴 Colombia',      '2026-06-18T03:00:00Z', 'Estadio Azteca',          'Mexico City, Mexico'),
+    gm(63,'K','🇵🇹 Portugal',    '🇺🇿 Uzbekistan',    '2026-06-23T17:00:00Z', 'NRG Stadium',             'Houston, TX'),
+    gm(64,'K','🇨🇴 Colombia',    '🇨🇩 DR Congo',      '2026-06-24T02:00:00Z', 'Estadio Akron',           'Zapopan, Mexico'),
+    gm(65,'K','🇨🇴 Colombia',    '🇵🇹 Portugal',      '2026-06-27T23:30:00Z', 'Hard Rock Stadium',       'Miami Gardens, FL'),
+    gm(66,'K','🇨🇩 DR Congo',    '🇺🇿 Uzbekistan',    '2026-06-27T23:30:00Z', 'Mercedes-Benz Stadium',   'Atlanta, GA'),
+    // ── GROUP L: 🏴󠁧󠁢󠁥󠁮󠁧󠁿 England · 🇭🇷 Croatia · 🇬🇭 Ghana · 🇵🇦 Panama ─────────────
+    gm(67,'L','🏴󠁧󠁢󠁥󠁮󠁧󠁿 England',    '🇭🇷 Croatia',       '2026-06-17T22:00:00Z', 'AT&T Stadium',            'Arlington, TX'),
+    gm(68,'L','🇬🇭 Ghana',       '🇵🇦 Panama',        '2026-06-18T01:00:00Z', 'BMO Field',               'Toronto, Canada'),
+    gm(69,'L','🏴󠁧󠁢󠁥󠁮󠁧󠁿 England',    '🇬🇭 Ghana',         '2026-06-23T20:00:00Z', 'Gillette Stadium',        'Foxborough, MA'),
+    gm(70,'L','🇵🇦 Panama',      '🇭🇷 Croatia',       '2026-06-23T23:00:00Z', 'BMO Field',               'Toronto, Canada'),
+    gm(71,'L','🇵🇦 Panama',      '🏴󠁧󠁢󠁥󠁮󠁧󠁿 England',     '2026-06-27T21:00:00Z', 'MetLife Stadium',         'East Rutherford, NJ'),
+    gm(72,'L','🇭🇷 Croatia',     '🇬🇭 Ghana',         '2026-06-27T21:00:00Z', 'Lincoln Financial Field', 'Philadelphia, PA'),
+
+    // ── Round of 32 (June 28 – July 3) ────────────────────────────────────────
+    km('r32', 1,'Runner-up A',    'Runner-up B',   '2026-06-28T19:00:00Z', 'SoFi Stadium',            'Inglewood, CA'),
+    km('r32', 2,'Winner C',       'Runner-up F',   '2026-06-29T17:00:00Z', 'NRG Stadium',             'Houston, TX'),
+    km('r32', 3,'Winner E',       'Best 3rd ABCDF','2026-06-29T20:30:00Z', 'Gillette Stadium',        'Foxborough, MA'),
+    km('r32', 4,'Winner F',       'Runner-up C',   '2026-06-30T01:00:00Z', 'Estadio BBVA',            'Monterrey, Mexico'),
+    km('r32', 5,'Runner-up E',    'Runner-up I',   '2026-06-30T17:00:00Z', 'AT&T Stadium',            'Arlington, TX'),
+    km('r32', 6,'Winner I',       'Best 3rd CDFGH','2026-06-30T21:00:00Z', 'MetLife Stadium',         'East Rutherford, NJ'),
+    km('r32', 7,'Winner A',       'Best 3rd CEFHI','2026-07-01T01:00:00Z', 'Estadio Azteca',          'Mexico City, Mexico'),
+    km('r32', 8,'Winner L',       'Best 3rd EHIJK','2026-07-01T16:00:00Z', 'Mercedes-Benz Stadium',   'Atlanta, GA'),
+    km('r32', 9,'Winner G',       'Best 3rd AEHIJ','2026-07-01T20:00:00Z', 'Lumen Field',             'Seattle, WA'),
+    km('r32',10,'Winner D',       'Best 3rd BEFIJ','2026-07-02T00:00:00Z', "Levi's Stadium",          'Santa Clara, CA'),
+    km('r32',11,'Winner H',       'Runner-up J',   '2026-07-02T19:00:00Z', 'SoFi Stadium',            'Inglewood, CA'),
+    km('r32',12,'Runner-up K',    'Runner-up L',   '2026-07-02T23:00:00Z', 'BMO Field',               'Toronto, Canada'),
+    km('r32',13,'Winner B',       'Best 3rd EFGIJ','2026-07-03T03:00:00Z', 'BC Place',                'Vancouver, Canada'),
+    km('r32',14,'Runner-up D',    'Runner-up G',   '2026-07-03T18:00:00Z', 'AT&T Stadium',            'Arlington, TX'),
+    km('r32',15,'Winner J',       'Runner-up H',   '2026-07-03T22:00:00Z', 'Hard Rock Stadium',       'Miami Gardens, FL'),
+    km('r32',16,'Winner K',       'Best 3rd DEIJL','2026-07-04T01:30:00Z', 'Arrowhead Stadium',       'Kansas City, MO'),
+
+    // ── Round of 16 (July 4 – 7) ──────────────────────────────────────────────
+    km('r16', 1,'R32 Winner 1',   'R32 Winner 2',  '2026-07-04T17:00:00Z', 'NRG Stadium',             'Houston, TX'),
+    km('r16', 2,'R32 Winner 3',   'R32 Winner 4',  '2026-07-04T21:00:00Z', 'Lincoln Financial Field', 'Philadelphia, PA'),
+    km('r16', 3,'R32 Winner 5',   'R32 Winner 6',  '2026-07-05T20:00:00Z', 'MetLife Stadium',         'East Rutherford, NJ'),
+    km('r16', 4,'R32 Winner 7',   'R32 Winner 8',  '2026-07-06T00:00:00Z', 'Estadio Azteca',          'Mexico City, Mexico'),
+    km('r16', 5,'R32 Winner 9',   'R32 Winner 10', '2026-07-06T19:00:00Z', 'AT&T Stadium',            'Arlington, TX'),
+    km('r16', 6,'R32 Winner 11',  'R32 Winner 12', '2026-07-07T00:00:00Z', 'Lumen Field',             'Seattle, WA'),
+    km('r16', 7,'R32 Winner 13',  'R32 Winner 14', '2026-07-07T16:00:00Z', 'Mercedes-Benz Stadium',   'Atlanta, GA'),
+    km('r16', 8,'R32 Winner 15',  'R32 Winner 16', '2026-07-07T20:00:00Z', 'BC Place',                'Vancouver, Canada'),
+
+    // ── Quarter-finals (July 9 – 11) ──────────────────────────────────────────
+    km('qf',  1,'R16 Winner 1',   'R16 Winner 2',  '2026-07-09T20:00:00Z', 'Gillette Stadium',        'Foxborough, MA'),
+    km('qf',  2,'R16 Winner 3',   'R16 Winner 4',  '2026-07-10T19:00:00Z', 'SoFi Stadium',            'Inglewood, CA'),
+    km('qf',  3,'R16 Winner 5',   'R16 Winner 6',  '2026-07-11T21:00:00Z', 'Hard Rock Stadium',       'Miami Gardens, FL'),
+    km('qf',  4,'R16 Winner 7',   'R16 Winner 8',  '2026-07-12T01:00:00Z', 'Arrowhead Stadium',       'Kansas City, MO'),
+
+    // ── Semi-finals (July 14 – 15) ────────────────────────────────────────────
+    km('sf',  1,'QF Winner 1',    'QF Winner 2',   '2026-07-14T19:00:00Z', 'AT&T Stadium',            'Arlington, TX'),
+    km('sf',  2,'QF Winner 3',    'QF Winner 4',   '2026-07-15T19:00:00Z', 'Mercedes-Benz Stadium',   'Atlanta, GA'),
+
+    // ── Third-place match (July 18) ────────────────────────────────────────────
+    km('3rd', 1,'SF Loser 1',     'SF Loser 2',    '2026-07-18T21:00:00Z', 'Hard Rock Stadium',       'Miami Gardens, FL'),
+
+    // ── Final (July 19) ───────────────────────────────────────────────────────
+    km('final',1,'SF Winner 1',   'SF Winner 2',   '2026-07-19T19:00:00Z', 'MetLife Stadium',         'East Rutherford, NJ'),
+  ];
+
+  const seedTx = db.transaction(() => {
+    fixtures.forEach(f => ins.run(f));
+  });
   seedTx();
-  console.log('✅ WC 2026 fixtures seeded (72 group + 32 knockout matches)');
+  console.log(`✅ WC 2026 fixtures seeded: ${fixtures.length} matches`);
 }
 
 // ── Scoring engine ─────────────────────────────────────────────────────────────

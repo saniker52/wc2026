@@ -6,58 +6,101 @@
     <% if (flashSuccess) { %><div class="flash flash-success">✅ <%- flashSuccess %></div><% } %>
     <% if (flashError)   { %><div class="flash flash-error">⚠️ <%- flashError %></div><% } %>
 
-    <!-- Hero greeting -->
-    <div style="margin-bottom:28px;">
-      <h1 style="font-size:1.6rem;font-weight:800">
-        👋 Welcome, <span style="color:var(--gold)"><%= user.display_name %></span>
+    <!-- Greeting + compact stats -->
+    <div style="margin-bottom:20px">
+      <h1 style="font-size:1.5rem;font-weight:800">
+        👋 <span style="color:var(--gold)"><%= user.display_name %></span>
+        <span style="font-size:.9rem;font-weight:500;color:var(--text-dim)">· Chalet 1267 – WC 2026</span>
       </h1>
-      <p class="text-muted mt-8">FIFA World Cup 2026 · All times in Kuwait Time</p>
-    </div>
-
-    <!-- Stats -->
-    <div class="stats-grid">
-      <div class="stat-card">
-        <div class="stat-value" style="color:var(--gold)">🏆 <%= stats.rank %></div>
-        <div class="stat-label">Your Rank <small style="color:var(--muted)">/ <%= stats.totalUsers %></small></div>
-      </div>
-      <div class="stat-card">
-        <div class="stat-value"><%= stats.totalPts %></div>
-        <div class="stat-label">Total Points</div>
-      </div>
-      <div class="stat-card">
-        <div class="stat-value" style="color:var(--blue)"><%= stats.groupPts %></div>
-        <div class="stat-label">Group Stage Pts</div>
-      </div>
-      <div class="stat-card">
-        <div class="stat-value" style="color:#a78bfa"><%= stats.knockoutPts %></div>
-        <div class="stat-label">Knockout Pts</div>
-      </div>
-      <div class="stat-card">
-        <div class="stat-value" style="color:var(--gold)"><%= stats.bonusPts %></div>
-        <div class="stat-label">Bonus Pts</div>
-      </div>
-      <div class="stat-card">
-        <div class="stat-value" style="color:var(--green)"><%= stats.correct %></div>
-        <div class="stat-label">Correct Picks</div>
+      <div class="stats-grid" style="margin-top:12px">
+        <div class="stat-card">
+          <div class="stat-value" style="color:var(--gold)">🏆 #<%= stats.rank %></div>
+          <div class="stat-label">Rank<small style="color:var(--muted)"> / <%= stats.totalUsers %></small></div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-value"><%= stats.totalPts %></div>
+          <div class="stat-label">Total Pts</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-value" style="color:var(--blue)"><%= stats.groupPts %></div>
+          <div class="stat-label">Group Pts</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-value" style="color:#a78bfa"><%= stats.knockoutPts %></div>
+          <div class="stat-label">KO Pts</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-value" style="color:var(--gold)"><%= stats.bonusPts %></div>
+          <div class="stat-label">Bonus</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-value" style="color:var(--green)"><%= stats.correct %></div>
+          <div class="stat-label">Correct</div>
+        </div>
       </div>
     </div>
 
+    <!-- Full leaderboard table -->
+    <div class="section-header" style="margin-bottom:12px">
+      <div>
+        <div class="section-title">🏆 Leaderboard</div>
+        <div class="section-subtitle">Live standings</div>
+      </div>
+      <a href="/leaderboard" class="btn btn-secondary btn-sm">Filters →</a>
+    </div>
+
+    <div class="card" style="overflow:hidden;margin-bottom:28px;padding:0">
+      <table style="width:100%;border-collapse:collapse;font-size:.88rem">
+        <thead>
+          <tr style="background:rgba(255,255,255,.04);color:var(--text-dim);font-size:.72rem;text-transform:uppercase;letter-spacing:.04em">
+            <th style="padding:9px 12px;text-align:left">#</th>
+            <th style="padding:9px 12px;text-align:left">Player</th>
+            <th style="padding:9px 12px;text-align:right">Grp</th>
+            <th style="padding:9px 12px;text-align:right">KO</th>
+            <th style="padding:9px 12px;text-align:right">Bonus</th>
+            <th style="padding:9px 12px;text-align:right">Awds</th>
+            <th style="padding:9px 12px;text-align:right">Total</th>
+          </tr>
+        </thead>
+        <tbody>
+          <% leaderboard.forEach((row, i) => { %>
+          <%
+            const isMe = row.id === user.id;
+            const medal = row.rank === 1 ? '🥇' : row.rank === 2 ? '🥈' : row.rank === 3 ? '🥉' : '#' + row.rank;
+          %>
+          <tr style="border-top:1px solid var(--border);<%= isMe ? 'background:rgba(59,130,246,.14);' : (i%2===0?'':'background:rgba(255,255,255,.015);') %>">
+            <td style="padding:10px 12px;font-weight:700;color:<%= row.rank<=3 ? 'var(--gold)' : 'var(--text-dim)' %>"><%= medal %></td>
+            <td style="padding:10px 12px;font-weight:<%= isMe ? '700' : '500' %>;color:<%= isMe ? 'var(--gold)' : 'var(--text)' %>">
+              <%= row.display_name %><% if (isMe) { %>&nbsp;<span style="font-size:.68rem;color:var(--accent)">you</span><% } %>
+            </td>
+            <td style="padding:10px 12px;text-align:right;color:var(--blue)"><%= row.group_pts %></td>
+            <td style="padding:10px 12px;text-align:right;color:#a78bfa"><%= row.knockout_pts %></td>
+            <td style="padding:10px 12px;text-align:right;color:var(--gold)"><%= row.bonus_pts %></td>
+            <td style="padding:10px 12px;text-align:right;color:var(--green)"><%= row.award_pts %></td>
+            <td style="padding:10px 12px;text-align:right;font-weight:700;color:<%= isMe ? 'var(--gold)' : 'var(--text)' %>"><%= row.total %></td>
+          </tr>
+          <% }) %>
+          <% if (leaderboard.length === 0) { %>
+          <tr><td colspan="7" style="padding:20px;text-align:center;color:var(--text-dim)">No players yet.</td></tr>
+          <% } %>
+        </tbody>
+      </table>
+    </div>
+
+    <!-- Upcoming predictions + Recent results -->
     <div style="display:grid;gap:24px;grid-template-columns:1fr 1fr;" class="dashboard-cols">
 
-      <!-- Upcoming matches needing predictions -->
       <div>
         <div class="section-header">
           <div>
             <div class="section-title">⏳ Predict Now</div>
-            <div class="section-subtitle">Open matches awaiting your prediction</div>
+            <div class="section-subtitle">Open matches</div>
           </div>
-          <a href="/matches" class="btn btn-secondary btn-sm">View All</a>
+          <a href="/matches" class="btn btn-secondary btn-sm">All →</a>
         </div>
 
         <% if (upcoming.length === 0) { %>
-          <div class="card text-center text-muted" style="padding:28px">
-            🎉 All upcoming matches are predicted!
-          </div>
+          <div class="card text-center text-muted" style="padding:28px">🎉 All caught up!</div>
         <% } else { %>
           <div class="matches-grid">
             <% upcoming.forEach(m => { %>
@@ -82,14 +125,13 @@
         <% } %>
       </div>
 
-      <!-- Recent results -->
       <div>
         <div class="section-header">
           <div>
             <div class="section-title">📊 Recent Results</div>
             <div class="section-subtitle">Your latest points</div>
           </div>
-          <a href="/matches?round=group" class="btn btn-secondary btn-sm">All Matches</a>
+          <a href="/matches?round=group" class="btn btn-secondary btn-sm">All →</a>
         </div>
 
         <% if (recent.length === 0) { %>
@@ -107,20 +149,16 @@
               <div class="match-header">
                 <span><%= m.group_name ? `Group ${m.group_name}` : m.round.toUpperCase() %></span>
                 <span class="<%= m.pts && m.pts.main > 0 ? 'text-green' : (m.prediction ? 'text-red' : 'text-muted') %>">
-                  <% if (m.prediction && m.result) { %>
-                    +<%= (m.pts.main + m.pts.bonus) %> pts
-                  <% } else { %>
-                    No prediction
-                  <% } %>
+                  <% if (m.prediction && m.result) { %>+<%= (m.pts.main + m.pts.bonus) %> pts<% } else { %>No pred<% } %>
                 </span>
               </div>
               <div class="match-body" style="padding:10px 16px">
                 <div class="match-teams">
-                  <div class="team-name team-a" style="font-size:.88rem"><%= m.team_a %></div>
+                  <div class="team-name team-a" style="font-size:.82rem"><%= m.team_a %></div>
                   <div class="result-badge">
-                    <% if (m.result === 'team_a') { %>🏆<% } else if (m.result === 'draw') { %>🤝<% } else { %>🏆<% } %>
+                    <% if (m.result === 'draw') { %>🤝<% } else { %>🏆<% } %>
                   </div>
-                  <div class="team-name team-b" style="font-size:.88rem"><%= m.team_b %></div>
+                  <div class="team-name team-b" style="font-size:.82rem"><%= m.team_b %></div>
                 </div>
                 <% if (m.prediction) { %>
                 <div class="match-actions">
@@ -138,19 +176,90 @@
           </div>
         <% } %>
       </div>
+
     </div>
 
     <div class="mt-24">
-      <a href="/leaderboard" class="btn btn-secondary">🏆 Full Leaderboard</a>
-      &nbsp;
       <a href="/awards" class="btn btn-secondary">🌟 Tournament Awards</a>
+      &nbsp;
+      <a href="/rules" class="btn btn-secondary">📋 Rules</a>
     </div>
 
   </div>
 </div>
 
+<!-- ── One-time Welcome Popup ──────────────────────────────────────────────── -->
+<div id="welcome-overlay" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.78);z-index:1000;overflow-y:auto;padding:20px 12px">
+  <div style="max-width:520px;margin:auto;background:var(--surface);border-radius:16px;border:1px solid var(--border);padding:28px 24px">
+    <div style="text-align:center;margin-bottom:20px">
+      <div style="font-size:2.4rem">⚽</div>
+      <h2 style="font-size:1.4rem;font-weight:800;color:var(--gold);margin:8px 0 4px">Welcome to Chalet 1267!</h2>
+      <p style="color:var(--text-dim);font-size:.88rem">World Cup 2026 Prediction Competition</p>
+    </div>
+
+    <div style="margin-bottom:16px">
+      <h3 style="font-size:.95rem;font-weight:700;margin-bottom:8px;color:var(--text)">📋 How to Predict</h3>
+      <p style="font-size:.86rem;color:var(--text-dim);line-height:1.65">
+        Open <strong style="color:var(--text)">Matches</strong> and tap <strong style="color:var(--accent)">⚽ Predict</strong> on any match card.
+        For <strong style="color:var(--text)">Group Stage</strong>: pick <em>Team A wins · Draw · Team B wins</em>.
+        For <strong style="color:var(--text)">Knockout</strong>: pick <em>who wins</em> + <em>90 min or AET</em>.
+        You can edit your pick any time before kick-off. After kick-off it's 🔒 locked.
+      </p>
+    </div>
+
+    <div style="margin-bottom:20px">
+      <h3 style="font-size:.95rem;font-weight:700;margin-bottom:10px;color:var(--text)">🏅 Scoring</h3>
+      <table style="width:100%;border-collapse:collapse;font-size:.82rem">
+        <thead>
+          <tr style="background:rgba(255,255,255,.05);color:var(--text-dim)">
+            <th style="padding:6px 10px;text-align:left">Stage</th>
+            <th style="padding:6px 10px;text-align:right">Points</th>
+            <th style="padding:6px 10px;text-align:right;color:var(--gold)">+ AET Bonus</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr style="border-top:1px solid var(--border)"><td style="padding:6px 10px">Group Stage</td><td style="padding:6px 10px;text-align:right;color:var(--blue)">1</td><td style="padding:6px 10px;text-align:right;color:var(--text-dim)">—</td></tr>
+          <tr style="border-top:1px solid var(--border);background:rgba(255,255,255,.02)"><td style="padding:6px 10px">Round of 32</td><td style="padding:6px 10px;text-align:right;color:var(--blue)">2</td><td style="padding:6px 10px;text-align:right;color:var(--gold)">+1</td></tr>
+          <tr style="border-top:1px solid var(--border)"><td style="padding:6px 10px">Round of 16</td><td style="padding:6px 10px;text-align:right;color:var(--blue)">3</td><td style="padding:6px 10px;text-align:right;color:var(--gold)">+1</td></tr>
+          <tr style="border-top:1px solid var(--border);background:rgba(255,255,255,.02)"><td style="padding:6px 10px">Quarter-finals</td><td style="padding:6px 10px;text-align:right;color:var(--blue)">4</td><td style="padding:6px 10px;text-align:right;color:var(--gold)">+1</td></tr>
+          <tr style="border-top:1px solid var(--border)"><td style="padding:6px 10px">Semi-finals</td><td style="padding:6px 10px;text-align:right;color:var(--blue)">5</td><td style="padding:6px 10px;text-align:right;color:var(--gold)">+1</td></tr>
+          <tr style="border-top:1px solid var(--border);background:rgba(255,255,255,.02)"><td style="padding:6px 10px">3rd Place</td><td style="padding:6px 10px;text-align:right;color:var(--blue)">4</td><td style="padding:6px 10px;text-align:right;color:var(--gold)">+1</td></tr>
+          <tr style="border-top:1px solid var(--border)"><td style="padding:6px 10px;font-weight:700">Final 🏆</td><td style="padding:6px 10px;text-align:right;color:var(--gold);font-weight:700">6</td><td style="padding:6px 10px;text-align:right;color:var(--gold)">+1</td></tr>
+          <tr style="border-top:2px solid var(--border);background:rgba(255,255,255,.03)"><td style="padding:6px 10px;color:var(--green)">🌟 Each Award</td><td style="padding:6px 10px;text-align:right;color:var(--green);font-weight:700">10</td><td style="padding:6px 10px;text-align:right;color:var(--text-dim)">—</td></tr>
+        </tbody>
+      </table>
+      <p style="font-size:.76rem;color:var(--text-dim);margin-top:7px">
+        The <strong style="color:var(--gold)">+1 AET Bonus</strong>: correctly predict if a knockout match ends in 90 min or goes to extra time / penalties.
+      </p>
+    </div>
+
+    <button onclick="closeWelcome()" class="btn btn-primary" style="width:100%;font-size:1rem;padding:12px">
+      ⚽ Let's Go — Start Predicting!
+    </button>
+    <p style="text-align:center;font-size:.74rem;color:var(--text-dim);margin-top:10px">
+      Review the full rules anytime under <strong>Rules</strong> in the menu.
+    </p>
+  </div>
+</div>
+
 <style>
 @media (max-width: 700px) { .dashboard-cols { grid-template-columns: 1fr !important; } }
+.text-red { color: #f87171 !important; }
 </style>
+
+<script>
+(function() {
+  var KEY = 'chalet1267_welcome_v1';
+  if (!localStorage.getItem(KEY)) {
+    document.getElementById('welcome-overlay').style.display = 'block';
+    document.body.style.overflow = 'hidden';
+  }
+})();
+function closeWelcome() {
+  localStorage.setItem('chalet1267_welcome_v1', '1');
+  document.getElementById('welcome-overlay').style.display = 'none';
+  document.body.style.overflow = '';
+}
+</script>
 
 <%- include('partials/footer') %>
