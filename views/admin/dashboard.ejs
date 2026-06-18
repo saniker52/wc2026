@@ -125,15 +125,15 @@
         <tbody>
           <%
             const rounds = [
-              { key: 'group_md1', label: '⚽ Group Stage — Matchday 1', sub: 'Jun 11–17' },
-              { key: 'group_md2', label: '⚽ Group Stage — Matchday 2', sub: 'Jun 18–23' },
-              { key: 'group_md3', label: '⚽ Group Stage — Matchday 3', sub: 'Jun 24+' },
-              { key: 'r32',   label: '🏆 Round of 32',    sub: '' },
-              { key: 'r16',   label: '🏆 Round of 16',    sub: '' },
-              { key: 'qf',    label: '🏆 Quarterfinals',  sub: '' },
-              { key: 'sf',    label: '🏆 Semifinals',     sub: '' },
-              { key: '3rd',   label: '🏆 Third Place',    sub: '' },
-              { key: 'final', label: '🏆 Final',          sub: '' },
+              { key: 'group_md1', label: 'Group Stage — Matchday 1', sub: 'Matches 1–24', dot: '#ef4444' },
+              { key: 'group_md2', label: 'Group Stage — Matchday 2', sub: 'Matches 25–48', dot: '#3b82f6' },
+              { key: 'group_md3', label: 'Group Stage — Matchday 3', sub: 'Matches 49–72', dot: '#22c55e' },
+              { key: 'r32',   label: 'Round of 32',   sub: '' },
+              { key: 'r16',   label: 'Round of 16',   sub: '' },
+              { key: 'qf',    label: 'Quarterfinals', sub: '' },
+              { key: 'sf',    label: 'Semifinals',    sub: '' },
+              { key: '3rd',   label: 'Third Place',   sub: '' },
+              { key: 'final', label: 'Final',         sub: '' },
             ];
           %>
           <% rounds.forEach((r, i) => {
@@ -143,8 +143,15 @@
           %>
           <tr style="border-top:1px solid var(--border)<%= i%2===1 ? ';background:rgba(255,255,255,.015)' : '' %>">
             <td style="padding:10px 12px">
-              <div style="font-weight:600;color:var(--text)"><%= r.label %></div>
-              <% if (r.sub) { %><div style="font-size:.72rem;color:var(--text-dim)"><%= r.sub %></div><% } %>
+              <div style="display:flex;align-items:center;gap:8px;font-weight:600;color:var(--text)">
+                <% if (r.dot) { %>
+                  <span style="display:inline-block;width:10px;height:10px;border-radius:50%;background:<%= r.dot %>;flex-shrink:0"></span>
+                <% } else { %>
+                  <span style="font-size:.9rem">🏆</span>
+                <% } %>
+                <%= r.label %>
+              </div>
+              <% if (r.sub) { %><div style="font-size:.72rem;color:var(--text-dim);margin-left:18px"><%= r.sub %></div><% } %>
             </td>
             <td style="padding:10px 12px;text-align:center">
               <% if (ls.total === 0) { %>

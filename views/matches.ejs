@@ -147,8 +147,13 @@
       %>
       <div class="match-card <%= cardClass %>" id="card-<%= m.id %>">
         <div class="match-header">
-          <div style="display:flex;align-items:center;gap:8px">
+          <div style="display:flex;align-items:center;gap:6px">
             <% if (m.group_name) { %>
+              <%
+                const mdNum = m.match_num <= 24 ? 1 : m.match_num <= 48 ? 2 : 3;
+                const mdColor = mdNum === 1 ? '#ef4444' : mdNum === 2 ? '#3b82f6' : '#22c55e';
+              %>
+              <span style="display:inline-flex;align-items:center;justify-content:center;width:18px;height:18px;border-radius:50%;background:<%= mdColor %>;font-size:.6rem;font-weight:800;color:#fff;flex-shrink:0" title="Matchday <%= mdNum %>">M<%= mdNum %></span>
               <span class="match-round-badge group">Group <%= m.group_name %></span>
             <% } else { %>
               <span class="match-round-badge knockout"><%= m.round.toUpperCase() %></span>

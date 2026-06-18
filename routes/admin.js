@@ -11,9 +11,9 @@ function logAction(db, adminId, action, details) {
   db.prepare('INSERT INTO admin_log (admin_id, action, details) VALUES (?, ?, ?)').run(adminId, action, details || null);
 }
 
-// ── Matchday date boundaries (UTC) ────────────────────────────────────────────
-const MD1_END = '2026-06-18T00:00:00Z';
-const MD2_END = '2026-06-24T00:00:00Z';
+// ── Matchday boundaries (match_num ranges, group stage only) ──────────────────
+// MD1: matches 1-24, MD2: 25-48, MD3: 49-72
+const MD = { md1: [1,24], md2: [25,48], md3: [49,72] };
 
 // ── Admin Dashboard ───────────────────────────────────────────────────────────
 router.get('/', (req, res) => {
@@ -24,26 +24,22 @@ router.get('/', (req, res) => {
   const lockedCount  = db.prepare("SELECT COUNT(*) as c FROM matches WHERE is_locked = 1").get().c;
   const totalPreds   = db.prepare("SELECT COUNT(*) as c FROM predictions").get().c;
 
-  // Per-matchday lock status
+  // Per-matchday lock status (by match_num)
+  const mdQ  = (lo,hi) => db.prepare(`SELECT COUNT(*) as c FROM matches WHERE round='group' AND match_num BETWEEN ? AND ?`).get(lo,hi).c;
+  const mdQL = (lo,hi) => db.prepare(`SELECT COUNT(*) as c FROM matches WHERE round='group' AND match_num BETWEEN ? AND ? AND is_locked=1`).get(lo,hi).c;
+  const rndQ  = r => db.prepare(`SELECT COUNT(*) as c FROM matches WHERE round=?`).get(r).c;
+  const rndQL = r => db.prepare(`SELECT COUNT(*) as c FROM matches WHERE round=? AND is_locked=1`).get(r).c;
+
   const lockStatus = {
-    group_md1: {
-      total: db.prepare(`SELECT COUNT(*) as c FROM matches WHERE round='group' AND match_time < ?`).get(MD1_END).c,
-      locked: db.prepare(`SELECT COUNT(*) as c FROM matches WHERE round='group' AND match_time < ? AND is_locked=1`).get(MD1_END).c,
-    },
-    group_md2: {
-      total: db.prepare(`SELECT COUNT(*) as c FROM matches WHERE round='group' AND match_time >= ? AND match_time < ?`).get(MD1_END, MD2_END).c,
-      locked: db.prepare(`SELECT COUNT(*) as c FROM matches WHERE round='group' AND match_time >= ? AND match_time < ? AND is_locked=1`).get(MD1_END, MD2_END).c,
-    },
-    group_md3: {
-      total: db.prepare(`SELECT COUNT(*) as c FROM matches WHERE round='group' AND match_time >= ?`).get(MD2_END).c,
-      locked: db.prepare(`SELECT COUNT(*) as c FROM matches WHERE round='group' AND match_time >= ? AND is_locked=1`).get(MD2_END).c,
-    },
-    r32:   { total: db.prepare(`SELECT COUNT(*) as c FROM matches WHERE round='r32'`).get().c,   locked: db.prepare(`SELECT COUNT(*) as c FROM matches WHERE round='r32' AND is_locked=1`).get().c },
-    r16:   { total: db.prepare(`SELECT COUNT(*) as c FROM matches WHERE round='r16'`).get().c,   locked: db.prepare(`SELECT COUNT(*) as c FROM matches WHERE round='r16' AND is_locked=1`).get().c },
-    qf:    { total: db.prepare(`SELECT COUNT(*) as c FROM matches WHERE round='qf'`).get().c,    locked: db.prepare(`SELECT COUNT(*) as c FROM matches WHERE round='qf' AND is_locked=1`).get().c },
-    sf:    { total: db.prepare(`SELECT COUNT(*) as c FROM matches WHERE round='sf'`).get().c,    locked: db.prepare(`SELECT COUNT(*) as c FROM matches WHERE round='sf' AND is_locked=1`).get().c },
-    '3rd': { total: db.prepare(`SELECT COUNT(*) as c FROM matches WHERE round='3rd'`).get().c,   locked: db.prepare(`SELECT COUNT(*) as c FROM matches WHERE round='3rd' AND is_locked=1`).get().c },
-    final: { total: db.prepare(`SELECT COUNT(*) as c FROM matches WHERE round='final'`).get().c, locked: db.prepare(`SELECT COUNT(*) as c FROM matches WHERE round='final' AND is_locked=1`).get().c },
+    group_md1: { total: mdQ(1,24),  locked: mdQL(1,24)  },
+    group_md2: { total: mdQ(25,48), locked: mdQL(25,48) },
+    group_md3: { total: mdQ(49,72), locked: mdQL(49,72) },
+    r32:   { total: rndQ('r32'),   locked: rndQL('r32')   },
+    r16:   { total: rndQ('r16'),   locked: rndQL('r16')   },
+    qf:    { total: rndQ('qf'),    locked: rndQL('qf')    },
+    sf:    { total: rndQ('sf'),    locked: rndQL('sf')    },
+    '3rd': { total: rndQ('3rd'),   locked: rndQL('3rd')   },
+    final: { total: rndQ('final'), locked: rndQL('final') },
   };
 
   // Recent log
@@ -178,14 +174,14 @@ router.post('/matches/lock-round', (req, res) => {
   let info, label;
 
   if (round === 'group_md1') {
-    info = db.prepare(`UPDATE matches SET is_locked=? WHERE round='group' AND match_time < ?`).run(locked, MD1_END);
-    label = 'Group MD1';
+    info = db.prepare(`UPDATE matches SET is_locked=? WHERE round='group' AND match_num BETWEEN 1 AND 24`).run(locked);
+    label = 'Group MD1 (Matches 1–24)';
   } else if (round === 'group_md2') {
-    info = db.prepare(`UPDATE matches SET is_locked=? WHERE round='group' AND match_time >= ? AND match_time < ?`).run(locked, MD1_END, MD2_END);
-    label = 'Group MD2';
+    info = db.prepare(`UPDATE matches SET is_locked=? WHERE round='group' AND match_num BETWEEN 25 AND 48`).run(locked);
+    label = 'Group MD2 (Matches 25–48)';
   } else if (round === 'group_md3') {
-    info = db.prepare(`UPDATE matches SET is_locked=? WHERE round='group' AND match_time >= ?`).run(locked, MD2_END);
-    label = 'Group MD3';
+    info = db.prepare(`UPDATE matches SET is_locked=? WHERE round='group' AND match_num BETWEEN 49 AND 72`).run(locked);
+    label = 'Group MD3 (Matches 49–72)';
   } else {
     info = db.prepare('UPDATE matches SET is_locked=? WHERE round=?').run(locked, round);
     label = round.toUpperCase();
