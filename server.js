@@ -20,7 +20,7 @@ app.use(express.static(path.join(__dirname, 'public')));
 
 // ── Sessions ──────────────────────────────────────────────────────────────────
 app.use(session({
-  store: new SQLiteStore({ db: 'sessions.db', dir: path.join(__dirname, 'db') }),
+  store: new SQLiteStore({ db: 'sessions.db', dir: process.env.DB_PATH || path.join(__dirname, 'db') }),
   secret: process.env.SESSION_SECRET || 'wc2026-super-secret-key-change-in-production',
   resave: false,
   saveUninitialized: false,

@@ -2,7 +2,8 @@ const Database = require('better-sqlite3');
 const bcrypt = require('bcryptjs');
 const path = require('path');
 
-const DB_PATH = path.join(__dirname, 'wc2026.db');
+const DB_DIR = process.env.DB_PATH || __dirname;
+const DB_PATH = path.join(DB_DIR, 'wc2026.db');
 
 let db;
 
