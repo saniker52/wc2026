@@ -118,7 +118,8 @@
         <thead>
           <tr style="background:rgba(255,255,255,.04);color:var(--text-dim);font-size:.72rem;text-transform:uppercase;letter-spacing:.04em">
             <th style="padding:8px 12px;text-align:left">Round / Matchday</th>
-            <th style="padding:8px 12px;text-align:center">Status</th>
+            <th style="padding:8px 12px;text-align:center">Lock Status</th>
+            <th style="padding:8px 12px;text-align:center">Predictions Visible</th>
             <th style="padding:8px 12px;text-align:right">Actions</th>
           </tr>
         </thead>
@@ -140,6 +141,7 @@
             const ls = lockStatus[r.key] || { total: 0, locked: 0 };
             const allLocked = ls.total > 0 && ls.locked === ls.total;
             const noneLocked = ls.locked === 0;
+            const isVisible = visibilityStatus[r.key] === 1;
           %>
           <tr style="border-top:1px solid var(--border)<%= i%2===1 ? ';background:rgba(255,255,255,.015)' : '' %>">
             <td style="padding:10px 12px">
@@ -163,6 +165,17 @@
               <% } else { %>
                 <span style="font-size:.78rem;color:var(--gold)"><%= ls.locked %>/<%= ls.total %> locked</span>
               <% } %>
+            </td>
+            <td style="padding:10px 12px;text-align:center">
+              <form method="POST" action="/admin/rounds/<%= r.key %>/visibility" style="display:inline-flex;gap:5px;align-items:center">
+                <% if (isVisible) { %>
+                  <span style="font-size:.78rem;color:var(--green);font-weight:600">👁 Visible</span>
+                  <button type="submit" name="action" value="hide" class="btn btn-sm" style="background:rgba(239,68,68,.15);color:#f87171;border-color:#f87171;font-size:.72rem;padding:3px 8px;margin-left:6px">Hide</button>
+                <% } else { %>
+                  <span style="font-size:.78rem;color:var(--muted)">🙈 Hidden</span>
+                  <button type="submit" name="action" value="show" class="btn btn-sm" style="background:rgba(34,197,94,.15);color:#4ade80;border-color:#4ade80;font-size:.72rem;padding:3px 8px;margin-left:6px">Show</button>
+                <% } %>
+              </form>
             </td>
             <td style="padding:10px 12px;text-align:right">
               <% if (ls.total > 0) { %>

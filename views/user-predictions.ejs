@@ -1,0 +1,86 @@
+<%- include('partials/header', { currentPage: '' }) %>
+
+<div class="page">
+  <div class="container" style="max-width:720px">
+
+    <% if (flashSuccess) { %><div class="flash flash-success">✅ <%- flashSuccess %></div><% } %>
+    <% if (flashError)   { %><div class="flash flash-error">⚠️ <%- flashError %></div><% } %>
+
+    <a href="/dashboard" class="btn btn-secondary btn-sm mb-16">← Back to Dashboard</a>
+
+    <div class="section-header" style="margin-bottom:16px">
+      <div>
+        <div class="section-title">🎯 <%= targetUser.display_name || targetUser.username %>'s Predictions</div>
+        <% if (isAdmin) { %>
+          <div class="section-subtitle" style="color:var(--gold)">Admin view — all predictions visible</div>
+        <% } else { %>
+          <div class="section-subtitle">Showing predictions for rounds that have been revealed</div>
+        <% } %>
+      </div>
+      <% if (isAdmin) { %>
+        <a href="/admin/users/<%= targetUser.id %>/predictions" class="btn btn-secondary btn-sm">Admin Edit →</a>
+      <% } %>
+    </div>
+
+    <% if (preds.length === 0) { %>
+      <div class="card text-center text-muted" style="padding:36px">
+        <div style="font-size:2rem;margin-bottom:12px">🔒</div>
+        <div>No predictions available yet — check back after the round begins.</div>
+      </div>
+    <% } else { %>
+
+    <div class="card" style="overflow:hidden;padding:0">
+      <table style="width:100%;border-collapse:collapse;font-size:.88rem">
+        <thead>
+          <tr style="background:rgba(255,255,255,.04);color:var(--text-dim);font-size:.72rem;text-transform:uppercase;letter-spacing:.04em">
+            <th style="padding:9px 12px;text-align:left">Match</th>
+            <th style="padding:9px 12px;text-align:left">Round</th>
+            <th style="padding:9px 12px;text-align:center">Prediction</th>
+            <th style="padding:9px 12px;text-align:center">Result</th>
+          </tr>
+        </thead>
+        <tbody>
+          <% preds.forEach((p, i) => {
+            const predLabel = p.prediction === 'team_a' ? p.team_a : (p.prediction === 'draw' ? 'Draw' : p.team_b);
+            const resultLabel = p.result === 'team_a' ? p.team_a : (p.result === 'draw' ? 'Draw' : (p.result === 'team_b' ? p.team_b : null));
+            const correct = p.result && p.prediction === p.result;
+            const wrong   = p.result && p.prediction !== p.result;
+            const roundLabel = p.group_name ? `Group ${p.group_name}` : p.round.toUpperCase();
+          %>
+          <tr style="border-top:1px solid var(--border)<%= i%2===1 ? ';background:rgba(255,255,255,.015)' : '' %>">
+            <td style="padding:9px 12px">
+              <div style="font-size:.82rem;font-weight:600"><%= p.team_a %> vs <%= p.team_b %></div>
+              <div style="font-size:.72rem;color:var(--text-dim)">⏰ <%= p.match_time_kwt %></div>
+            </td>
+            <td style="padding:9px 12px">
+              <span class="badge badge-<%= p.round === 'group' ? 'group' : 'knockout' %>" style="font-size:.72rem"><%= roundLabel %></span>
+            </td>
+            <td style="padding:9px 12px;text-align:center">
+              <span style="font-weight:600;color:<%= p.prediction === 'team_a' ? 'var(--blue)' : (p.prediction === 'draw' ? 'var(--text-dim)' : '#a78bfa') %>">
+                <%= predLabel %>
+              </span>
+              <% if (p.aet_prediction) { %>
+                <div style="font-size:.7rem;color:var(--text-dim)"><%= p.aet_prediction === 'aet' ? 'AET' : '90 min' %></div>
+              <% } %>
+            </td>
+            <td style="padding:9px 12px;text-align:center">
+              <% if (!p.result) { %>
+                <span style="font-size:.75rem;color:var(--muted)">Pending</span>
+              <% } else if (correct) { %>
+                <span class="prediction-pill correct" style="font-size:.72rem">✅ Correct</span>
+              <% } else { %>
+                <span class="prediction-pill incorrect" style="font-size:.72rem">❌ Wrong</span>
+              <% } %>
+            </td>
+          </tr>
+          <% }) %>
+        </tbody>
+      </table>
+    </div>
+
+    <% } %>
+
+  </div>
+</div>
+
+<%- include('partials/footer') %>

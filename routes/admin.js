@@ -42,6 +42,11 @@ router.get('/', (req, res) => {
     final: { total: rndQ('final'), locked: rndQL('final') },
   };
 
+  // Visibility status per round
+  const visRows = db.prepare('SELECT round, visible FROM round_visibility').all();
+  const visibilityStatus = {};
+  visRows.forEach(r => { visibilityStatus[r.round] = r.visible; });
+
   // Recent log
   const recentLog = db.prepare(`
     SELECT al.*, u.username FROM admin_log al
@@ -61,6 +66,7 @@ router.get('/', (req, res) => {
     title: 'Admin Dashboard',
     stats: { totalUsers, totalMatches, resultsIn, lockedCount, totalPreds },
     lockStatus,
+    visibilityStatus,
     recentLog,
     pendingResults: pendingResults.map(m => ({ ...m, match_time_kwt: toKuwaitTime(m.match_time) }))
   });
@@ -126,6 +132,38 @@ router.get('/matches/:id/edit', (req, res) => {
   res.render('admin/match-form', { title: 'Edit Match', match });
 });
 
+// Lock / unlock entire round (supports group_md1, group_md2, group_md3, and regular rounds)
+// ⚠️ MUST be before /matches/:id to avoid Express swallowing 'lock-round' as :id
+router.post('/matches/lock-round', (req, res) => {
+  const db = getDb();
+  const { round, action } = req.body;
+  const locked = action === 'lock' ? 1 : 0;
+  let info, label;
+
+  const allGids = db.prepare("SELECT id FROM matches WHERE round='group' ORDER BY match_time, id").all().map(r => r.id);
+  const ic = ids => ids.length ? ids.join(',') : '0';
+  if (round === 'group_md1') {
+    const ids = allGids.slice(0, 24);
+    info = db.prepare(`UPDATE matches SET is_locked=? WHERE id IN (${ic(ids)})`).run(locked);
+    label = 'Group MD1 (Games 1–24)';
+  } else if (round === 'group_md2') {
+    const ids = allGids.slice(24, 48);
+    info = db.prepare(`UPDATE matches SET is_locked=? WHERE id IN (${ic(ids)})`).run(locked);
+    label = 'Group MD2 (Games 25–48)';
+  } else if (round === 'group_md3') {
+    const ids = allGids.slice(48);
+    info = db.prepare(`UPDATE matches SET is_locked=? WHERE id IN (${ic(ids)})`).run(locked);
+    label = 'Group MD3 (Games 49–72)';
+  } else {
+    info = db.prepare('UPDATE matches SET is_locked=? WHERE round=?').run(locked, round);
+    label = round.toUpperCase();
+  }
+
+  logAction(db, req.session.user.id, action === 'lock' ? 'LOCK_ROUND' : 'UNLOCK_ROUND', `${label} (${info.changes} matches)`);
+  req.session.flashSuccess = `${label}: ${info.changes} matches ${action === 'lock' ? 'locked 🔒' : 'unlocked 🔓'}.`;
+  res.redirect('/admin');
+});
+
 // Update match
 router.post('/matches/:id', (req, res) => {
   const db = getDb();
@@ -166,34 +204,23 @@ router.post('/matches/:id/lock', (req, res) => {
   res.redirect(req.get('Referer') || '/admin/matches');
 });
 
-// Lock / unlock entire round (supports group_md1, group_md2, group_md3, and regular rounds)
-router.post('/matches/lock-round', (req, res) => {
+// ════════════════════════════════════════════════════════════════════════════════
+// ROUND VISIBILITY (show/hide other users' predictions per round)
+// ════════════════════════════════════════════════════════════════════════════════
+
+router.post('/rounds/:round/visibility', (req, res) => {
   const db = getDb();
-  const { round, action } = req.body;
-  const locked = action === 'lock' ? 1 : 0;
-  let info, label;
-
-  const allGids = db.prepare("SELECT id FROM matches WHERE round='group' ORDER BY match_time, id").all().map(r => r.id);
-  const ic = ids => ids.length ? ids.join(',') : '0';
-  if (round === 'group_md1') {
-    const ids = allGids.slice(0, 24);
-    info = db.prepare(`UPDATE matches SET is_locked=? WHERE id IN (${ic(ids)})`).run(locked);
-    label = 'Group MD1 (Games 1–24)';
-  } else if (round === 'group_md2') {
-    const ids = allGids.slice(24, 48);
-    info = db.prepare(`UPDATE matches SET is_locked=? WHERE id IN (${ic(ids)})`).run(locked);
-    label = 'Group MD2 (Games 25–48)';
-  } else if (round === 'group_md3') {
-    const ids = allGids.slice(48);
-    info = db.prepare(`UPDATE matches SET is_locked=? WHERE id IN (${ic(ids)})`).run(locked);
-    label = 'Group MD3 (Games 49–72)';
-  } else {
-    info = db.prepare('UPDATE matches SET is_locked=? WHERE round=?').run(locked, round);
-    label = round.toUpperCase();
-  }
-
-  logAction(db, req.session.user.id, action === 'lock' ? 'LOCK_ROUND' : 'UNLOCK_ROUND', `${label} (${info.changes} matches)`);
-  req.session.flashSuccess = `${label}: ${info.changes} matches ${action === 'lock' ? 'locked 🔒' : 'unlocked 🔓'}.`;
+  const { action } = req.body; // 'show' or 'hide'
+  const visible = action === 'show' ? 1 : 0;
+  db.prepare('INSERT OR REPLACE INTO round_visibility (round, visible) VALUES (?, ?)').run(req.params.round, visible);
+  const labels = {
+    group_md1: 'Group MD1', group_md2: 'Group MD2', group_md3: 'Group MD3',
+    r32: 'Round of 32', r16: 'Round of 16', qf: 'Quarterfinals',
+    sf: 'Semifinals', '3rd': 'Third Place', final: 'Final'
+  };
+  const label = labels[req.params.round] || req.params.round;
+  logAction(db, req.session.user.id, action === 'show' ? 'SHOW_PREDICTIONS' : 'HIDE_PREDICTIONS', `${label} predictions now ${action === 'show' ? 'visible' : 'hidden'} to users`);
+  req.session.flashSuccess = `${label}: predictions ${action === 'show' ? '👁 visible' : '🙈 hidden'} to users.`;
   res.redirect('/admin');
 });
 

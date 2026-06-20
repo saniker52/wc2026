@@ -130,9 +130,9 @@ router.get('/matches/:id', requireLogin, (req, res) => {
 
   const prediction = db.prepare('SELECT * FROM predictions WHERE user_id = ? AND match_id = ?').get(userId, matchId);
 
-  // Predictions from other users (visible once locked or result in)
+  // Admin always sees all predictions; users see them once match is locked or has result
   let otherPreds = [];
-  if (match.is_locked || match.result) {
+  if (req.session.user.is_admin || match.is_locked || match.result) {
     otherPreds = db.prepare(`
       SELECT u.username, u.display_name, p.prediction, p.aet_prediction
       FROM predictions p
@@ -260,6 +260,64 @@ router.post('/matches/:id/predict', requireLogin, (req, res) => {
 // ── Rules ─────────────────────────────────────────────────────────────────────
 router.get('/rules', requireLogin, (req, res) => {
   res.render('rules', { title: 'Competition Rules' });
+});
+
+// ── View another user's predictions (from leaderboard) ───────────────────────
+router.get('/users/:id/predictions', requireLogin, (req, res) => {
+  const db = getDb();
+  const viewerId = req.session.user.id;
+  const isAdmin = req.session.user.is_admin;
+  const targetId = parseInt(req.params.id);
+
+  // Can't view own predictions this way (redirect to dashboard)
+  if (targetId === viewerId && !isAdmin) return res.redirect('/dashboard');
+
+  const targetUser = db.prepare('SELECT id, username, display_name FROM users WHERE id = ? AND is_admin = 0').get(targetId);
+  if (!targetUser) { req.session.flashError = 'User not found.'; return res.redirect('/dashboard'); }
+
+  // Determine visible rounds (admin sees all)
+  let visibleRounds = null; // null = all
+  if (!isAdmin) {
+    const visRows = db.prepare('SELECT round FROM round_visibility WHERE visible = 1').all();
+    visibleRounds = new Set(visRows.map(r => r.round));
+  }
+
+  // Precompute group match IDs → matchday key
+  const allGroupIds = db.prepare("SELECT id FROM matches WHERE round='group' ORDER BY match_time, id").all().map(r => r.id);
+  const md1Ids = new Set(allGroupIds.slice(0, 24));
+  const md2Ids = new Set(allGroupIds.slice(24, 48));
+  function matchdayKey(matchId, round) {
+    if (round !== 'group') return round;
+    if (md1Ids.has(matchId)) return 'group_md1';
+    if (md2Ids.has(matchId)) return 'group_md2';
+    return 'group_md3';
+  }
+
+  // Fetch all predictions for target user
+  const allPreds = db.prepare(`
+    SELECT p.*, m.team_a, m.team_b, m.round, m.group_name, m.match_time, m.is_knockout,
+           r.result, r.aet_result
+    FROM predictions p
+    JOIN matches m ON m.id = p.match_id
+    LEFT JOIN results r ON r.match_id = p.match_id
+    WHERE p.user_id = ?
+    ORDER BY m.match_time ASC
+  `).all(targetId);
+
+  // Filter by visibility
+  const preds = allPreds.filter(p => {
+    if (!visibleRounds) return true; // admin sees all
+    const key = matchdayKey(p.match_id, p.round);
+    return visibleRounds.has(key);
+  });
+
+  res.render('user-predictions', {
+    title: `${targetUser.display_name || targetUser.username}'s Predictions`,
+    targetUser,
+    preds: preds.map(p => ({ ...p, match_time_kwt: toKuwaitTime(p.match_time) })),
+    isAdmin,
+    viewerName: req.session.user.display_name || req.session.user.username
+  });
 });
 
 module.exports = router;

@@ -82,6 +82,12 @@ function initSchema() {
       FOREIGN KEY (admin_id) REFERENCES users(id)
     );
 
+    -- ── Round visibility (admin-controlled per-round prediction visibility) ─────
+    CREATE TABLE IF NOT EXISTS round_visibility (
+      round   TEXT PRIMARY KEY,
+      visible INTEGER DEFAULT 0
+    );
+
     -- ── Indexes ────────────────────────────────────────────────────────────────
     CREATE INDEX IF NOT EXISTS idx_predictions_user    ON predictions(user_id);
     CREATE INDEX IF NOT EXISTS idx_predictions_match   ON predictions(match_id);
@@ -127,7 +133,7 @@ function seedInitialData() {
 }
 
 function seedUsersAndPredictions() {
-  const alreadySeeded = db.prepare(`SELECT value FROM db_meta WHERE key='users_seeded'`).get();
+  const alreadySeeded = db.prepare(`SELECT value FROM db_meta WHERE key='users_seeded_v2'`).get();
   if (alreadySeeded) return;
 
   // First 24 group matches in chronological order
@@ -198,7 +204,7 @@ function seedUsersAndPredictions() {
         if (pred) { upsertPred.run(userId, matches24[i].id, pred); preds++; }
       });
     }
-    db.prepare(`INSERT OR REPLACE INTO db_meta (key, value) VALUES ('users_seeded', '1')`).run();
+    db.prepare(`INSERT OR REPLACE INTO db_meta (key, value) VALUES ('users_seeded_v2', '1')`).run();
     console.log(`✅ Seeded ${USERS.length} users + ${preds} predictions`);
   });
   doSeed();
