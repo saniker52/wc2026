@@ -61,8 +61,8 @@
               else if (nextPred === 'team_a') { nextPredLabel = nextMatch.team_a; nextPredColor = 'var(--blue)'; }
               else { nextPredLabel = nextMatch.team_b; nextPredColor = '#a78bfa'; }
             }
-            // Hide next pick if match is locked and it's not the viewer's own row
-            const showNextPick = nextPred && (!nextMatch.is_locked || isMe);
+            // Show own pick always; show others' picks only when admin has enabled visibility for that round
+            const showNextPick = nextPred && (isMe || nextMatchRoundVisible);
           %>
           <tr style="border-top:1px solid var(--border);<%= isMe ? 'background:rgba(59,130,246,.14);' : (i%2===0?'':'background:rgba(255,255,255,.015);') %>">
             <td style="padding:10px 12px;font-weight:700;color:<%= row.rank<=3 ? 'var(--gold)' : 'var(--text-dim)' %>"><%= medal %></td>

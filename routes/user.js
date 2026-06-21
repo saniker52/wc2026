@@ -63,6 +63,19 @@ router.get('/dashboard', requireLogin, (req, res) => {
     ORDER BY m.match_time ASC LIMIT 1
   `).get(now);
 
+  // Is the next match's round visible to users?
+  let nextMatchRoundVisible = false;
+  if (nextMatch) {
+    const allGroupIds = db.prepare("SELECT id FROM matches WHERE round='group' ORDER BY match_time, id").all().map(r => r.id);
+    let roundKey = nextMatch.round;
+    if (roundKey === 'group') {
+      const idx = allGroupIds.indexOf(nextMatch.id);
+      roundKey = idx < 24 ? 'group_md1' : idx < 48 ? 'group_md2' : 'group_md3';
+    }
+    const visRow = db.prepare("SELECT visible FROM round_visibility WHERE round = ?").get(roundKey);
+    nextMatchRoundVisible = req.session.user.is_admin || (visRow && visRow.visible === 1);
+  }
+
   // All users' predictions for the next match (so we can show per-row in leaderboard)
   const nextPredMap = {};
   if (nextMatch) {
@@ -81,7 +94,8 @@ router.get('/dashboard', requireLogin, (req, res) => {
     stats: { totalPts, groupPts, knockoutPts, bonusPts, correct, rank: myRank, totalUsers },
     leaderboard: lb,
     nextMatch,
-    nextPredMap
+    nextPredMap,
+    nextMatchRoundVisible
   });
 });
 
