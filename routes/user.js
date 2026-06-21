@@ -100,7 +100,7 @@ router.get('/dashboard', requireLogin, (req, res) => {
   // Navigable list: today's past/ongoing + upcoming unplayed, within active window
   const navList = db.prepare(`
     SELECT m.id, m.team_a, m.team_b, m.match_time, m.round, m.group_name, m.is_locked,
-           r.result IS NOT NULL as has_result
+           r.result IS NOT NULL as has_result, r.result as match_result
     FROM matches m
     LEFT JOIN results r ON r.match_id = m.id
     WHERE (
