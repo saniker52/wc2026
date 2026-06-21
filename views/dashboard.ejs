@@ -127,7 +127,7 @@
             <div class="section-title">⏳ Predict Now</div>
             <div class="section-subtitle">Open matches</div>
           </div>
-          <a href="/matches" class="btn btn-secondary btn-sm">All →</a>
+          <button id="save-preds-btn" onclick="savePredictions()" class="btn btn-primary btn-sm" style="display:none">💾 Save</button>
         </div>
 
         <% if (upcoming.length === 0) { %>
@@ -135,7 +135,7 @@
         <% } else { %>
           <div class="matches-grid">
             <% upcoming.forEach(m => { %>
-            <div class="match-card">
+            <div class="match-card" id="card-<%= m.id %>">
               <div class="match-header">
                 <span><%= m.group_name ? `Group ${m.group_name}` : m.round.toUpperCase() %></span>
                 <span>⏰ <%= m.match_time_kwt %></span>
@@ -146,35 +146,46 @@
                   <div class="vs-badge">vs</div>
                   <div class="team-name team-b"><%= m.team_b %></div>
                 </div>
-                <form method="POST" action="/matches/<%= m.id %>/predict">
-                  <input type="hidden" name="_returnTo" value="/dashboard">
-                  <% if (!m.is_knockout) { %>
-                  <div style="display:flex;gap:4px">
-                    <button type="submit" name="prediction" value="team_a" class="dash-pred-btn<%= m.prediction==='team_a' ? ' dpb-a' : '' %>"><%= m.team_a %></button>
-                    <button type="submit" name="prediction" value="draw"   class="dash-pred-btn<%= m.prediction==='draw'   ? ' dpb-d' : '' %>">🤝 Draw</button>
-                    <button type="submit" name="prediction" value="team_b" class="dash-pred-btn<%= m.prediction==='team_b' ? ' dpb-b' : '' %>"><%= m.team_b %></button>
-                  </div>
-                  <% if (m.prediction) { %>
-                    <div style="text-align:center;font-size:.68rem;color:var(--muted);margin-top:4px">✓ Saved — tap to change</div>
-                  <% } %>
-                  <% } else { %>
-                  <div style="display:flex;gap:4px;margin-bottom:8px">
-                    <button type="submit" name="prediction" value="team_a" class="dash-pred-btn<%= m.prediction==='team_a' ? ' dpb-a' : '' %>" style="flex:1"><%= m.team_a %></button>
-                    <button type="submit" name="prediction" value="team_b" class="dash-pred-btn<%= m.prediction==='team_b' ? ' dpb-b' : '' %>" style="flex:1"><%= m.team_b %></button>
-                  </div>
-                  <div style="display:flex;gap:16px;justify-content:center;font-size:.75rem;color:var(--text-dim);margin-bottom:6px">
-                    <label style="display:flex;align-items:center;gap:4px;cursor:pointer">
-                      <input type="radio" name="aet_prediction" value="90min" <%= m.aet_prediction==='90min' ? 'checked' : '' %>> ⏱️ 90 min
-                    </label>
-                    <label style="display:flex;align-items:center;gap:4px;cursor:pointer">
-                      <input type="radio" name="aet_prediction" value="aet" <%= m.aet_prediction==='aet' ? 'checked' : '' %>> 🥅 AET
-                    </label>
-                  </div>
-                  <button type="submit" class="btn btn-primary btn-sm" style="width:100%">
-                    <%= m.prediction ? '✏️ Update' : '✅ Save' %>
-                  </button>
-                  <% } %>
-                </form>
+                <% if (!m.is_knockout) { %>
+                <div style="display:flex;gap:4px">
+                  <button type="button" data-match="<%= m.id %>" data-val="team_a"
+                    onclick="selectPred(<%= m.id %>,'team_a',this)"
+                    class="dash-pred-btn<%= m.prediction==='team_a' ? ' dpb-a' : '' %>"><%= m.team_a %></button>
+                  <button type="button" data-match="<%= m.id %>" data-val="draw"
+                    onclick="selectPred(<%= m.id %>,'draw',this)"
+                    class="dash-pred-btn<%= m.prediction==='draw' ? ' dpb-d' : '' %>">🤝 Draw</button>
+                  <button type="button" data-match="<%= m.id %>" data-val="team_b"
+                    onclick="selectPred(<%= m.id %>,'team_b',this)"
+                    class="dash-pred-btn<%= m.prediction==='team_b' ? ' dpb-b' : '' %>"><%= m.team_b %></button>
+                </div>
+                <div id="status-<%= m.id %>" style="text-align:center;font-size:.68rem;color:var(--muted);margin-top:4px">
+                  <%= m.prediction ? '✓ Saved' : '' %>
+                </div>
+                <% } else { %>
+                <div style="display:flex;gap:4px;margin-bottom:8px">
+                  <button type="button" data-match="<%= m.id %>" data-val="team_a"
+                    onclick="selectPred(<%= m.id %>,'team_a',this)"
+                    class="dash-pred-btn<%= m.prediction==='team_a' ? ' dpb-a' : '' %>" style="flex:1"><%= m.team_a %></button>
+                  <button type="button" data-match="<%= m.id %>" data-val="team_b"
+                    onclick="selectPred(<%= m.id %>,'team_b',this)"
+                    class="dash-pred-btn<%= m.prediction==='team_b' ? ' dpb-b' : '' %>" style="flex:1"><%= m.team_b %></button>
+                </div>
+                <div style="display:flex;gap:16px;justify-content:center;font-size:.75rem;color:var(--text-dim)">
+                  <label style="display:flex;align-items:center;gap:4px;cursor:pointer">
+                    <input type="radio" name="aet_<%= m.id %>" value="90min"
+                      onchange="selectAET(<%= m.id %>,'90min')"
+                      <%= m.aet_prediction==='90min' ? 'checked' : '' %>> ⏱️ 90 min
+                  </label>
+                  <label style="display:flex;align-items:center;gap:4px;cursor:pointer">
+                    <input type="radio" name="aet_<%= m.id %>" value="aet"
+                      onchange="selectAET(<%= m.id %>,'aet')"
+                      <%= m.aet_prediction==='aet' ? 'checked' : '' %>> 🥅 AET
+                  </label>
+                </div>
+                <div id="status-<%= m.id %>" style="text-align:center;font-size:.68rem;color:var(--muted);margin-top:4px">
+                  <%= m.prediction ? '✓ Saved' : '' %>
+                </div>
+                <% } %>
               </div>
             </div>
             <% }) %>
@@ -325,6 +336,76 @@
 .dash-pred-btn.dpb-d { border-color: var(--gold); background: rgba(251,191,36,.12); color: var(--gold); font-weight: 700; }
 .dash-pred-btn.dpb-b { border-color: #a78bfa; background: rgba(167,139,250,.18); color: #a78bfa; font-weight: 700; }
 </style>
+
+<script>
+// ── Batch predictions ─────────────────────────────────────────────────────────
+var pendingPreds = {};
+
+function selectPred(matchId, val, btn) {
+  if (!pendingPreds[matchId]) pendingPreds[matchId] = {};
+  pendingPreds[matchId].prediction = val;
+  // update button highlight
+  document.querySelectorAll('[data-match="' + matchId + '"]').forEach(function(b) {
+    b.classList.remove('dpb-a','dpb-d','dpb-b');
+  });
+  btn.classList.add(val === 'team_a' ? 'dpb-a' : val === 'draw' ? 'dpb-d' : 'dpb-b');
+  // update status label
+  var s = document.getElementById('status-' + matchId);
+  if (s) s.textContent = '· unsaved';
+  updateSaveBtn();
+}
+
+function selectAET(matchId, val) {
+  if (!pendingPreds[matchId]) pendingPreds[matchId] = {};
+  pendingPreds[matchId].aet_prediction = val;
+  var s = document.getElementById('status-' + matchId);
+  if (s) s.textContent = '· unsaved';
+  updateSaveBtn();
+}
+
+function updateSaveBtn() {
+  var btn = document.getElementById('save-preds-btn');
+  if (!btn) return;
+  var count = Object.keys(pendingPreds).length;
+  if (count > 0) {
+    btn.style.display = '';
+    btn.textContent = '💾 Save (' + count + ')';
+  } else {
+    btn.style.display = 'none';
+  }
+}
+
+async function savePredictions() {
+  var btn = document.getElementById('save-preds-btn');
+  var predictions = Object.entries(pendingPreds)
+    .filter(function(e) { return e[1].prediction; })
+    .map(function(e) {
+      return { matchId: parseInt(e[0]), prediction: e[1].prediction, aet_prediction: e[1].aet_prediction || null };
+    });
+  if (!predictions.length) return;
+  btn.disabled = true;
+  btn.textContent = 'Saving…';
+  try {
+    var res = await fetch('/matches/predict-batch', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ predictions: predictions })
+    });
+    var data = await res.json();
+    if (data.ok) {
+      location.reload();
+    } else {
+      alert('Some picks couldn\'t be saved:\n' + (data.errors || []).join('\n'));
+      btn.disabled = false;
+      updateSaveBtn();
+    }
+  } catch(e) {
+    alert('Network error — please try again.');
+    btn.disabled = false;
+    updateSaveBtn();
+  }
+}
+</script>
 
 <script>
 // Auto-refresh when the next upcoming match changes (game completed)
