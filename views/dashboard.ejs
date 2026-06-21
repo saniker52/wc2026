@@ -82,8 +82,8 @@
             let nextPredLabel = '—', nextPredColor = 'var(--muted)';
             if (nextPred && displayMatch) {
               if (nextPred === 'draw') { nextPredLabel = 'Draw'; nextPredColor = 'var(--text-dim)'; }
-              else if (nextPred === 'team_a') { nextPredLabel = displayMatch.team_a; nextPredColor = 'var(--blue)'; }
-              else { nextPredLabel = displayMatch.team_b; nextPredColor = '#a78bfa'; }
+              else if (nextPred === 'team_a') { nextPredLabel = displayMatch.team_a; nextPredColor = 'var(--text)'; }
+              else { nextPredLabel = displayMatch.team_b; nextPredColor = 'var(--text)'; }
             }
             // Show own pick always; show others' picks only when admin has enabled visibility for that round
             const showNextPick = nextPred && (isMe || nextMatchRoundVisible);
@@ -135,7 +135,7 @@
         <% } else { %>
           <div class="matches-grid">
             <% upcoming.forEach(m => { %>
-            <div class="match-card" id="card-<%= m.id %>">
+            <div class="match-card<%= !m.prediction ? ' needs-pick' : '' %>" id="card-<%= m.id %>">
               <div class="match-header">
                 <span><%= m.group_name ? `Group ${m.group_name}` : m.round.toUpperCase() %></span>
                 <span>⏰ <%= m.match_time_kwt %></span>
@@ -150,25 +150,25 @@
                 <div style="display:flex;gap:4px">
                   <button type="button" data-match="<%= m.id %>" data-val="team_a"
                     onclick="selectPred(<%= m.id %>,'team_a',this)"
-                    class="dash-pred-btn<%= m.prediction==='team_a' ? ' dpb-a' : '' %>"><%= m.team_a %></button>
+                    class="dash-pred-btn<%= m.prediction==='team_a' ? ' dpb-sel' : '' %>"><%= m.team_a.split(' ')[0] %></button>
                   <button type="button" data-match="<%= m.id %>" data-val="draw"
                     onclick="selectPred(<%= m.id %>,'draw',this)"
-                    class="dash-pred-btn<%= m.prediction==='draw' ? ' dpb-d' : '' %>">🤝 Draw</button>
+                    class="dash-pred-btn<%= m.prediction==='draw' ? ' dpb-sel' : '' %>">🤝</button>
                   <button type="button" data-match="<%= m.id %>" data-val="team_b"
                     onclick="selectPred(<%= m.id %>,'team_b',this)"
-                    class="dash-pred-btn<%= m.prediction==='team_b' ? ' dpb-b' : '' %>"><%= m.team_b %></button>
+                    class="dash-pred-btn<%= m.prediction==='team_b' ? ' dpb-sel' : '' %>"><%= m.team_b.split(' ')[0] %></button>
                 </div>
-                <div id="status-<%= m.id %>" style="text-align:center;font-size:.68rem;color:var(--muted);margin-top:4px">
-                  <%= m.prediction ? '✓ Saved' : '' %>
+                <div id="status-<%= m.id %>" style="text-align:center;font-size:.68rem;margin-top:4px;color:<%= m.prediction ? 'var(--muted)' : '#fbbf24' %>">
+                  <%= m.prediction ? '✓ Saved' : '⚠ No pick yet' %>
                 </div>
                 <% } else { %>
                 <div style="display:flex;gap:4px;margin-bottom:8px">
                   <button type="button" data-match="<%= m.id %>" data-val="team_a"
                     onclick="selectPred(<%= m.id %>,'team_a',this)"
-                    class="dash-pred-btn<%= m.prediction==='team_a' ? ' dpb-a' : '' %>" style="flex:1"><%= m.team_a %></button>
+                    class="dash-pred-btn<%= m.prediction==='team_a' ? ' dpb-sel' : '' %>" style="flex:1"><%= m.team_a.split(' ')[0] %></button>
                   <button type="button" data-match="<%= m.id %>" data-val="team_b"
                     onclick="selectPred(<%= m.id %>,'team_b',this)"
-                    class="dash-pred-btn<%= m.prediction==='team_b' ? ' dpb-b' : '' %>" style="flex:1"><%= m.team_b %></button>
+                    class="dash-pred-btn<%= m.prediction==='team_b' ? ' dpb-sel' : '' %>" style="flex:1"><%= m.team_b.split(' ')[0] %></button>
                 </div>
                 <div style="display:flex;gap:16px;justify-content:center;font-size:.75rem;color:var(--text-dim)">
                   <label style="display:flex;align-items:center;gap:4px;cursor:pointer">
@@ -182,8 +182,8 @@
                       <%= m.aet_prediction==='aet' ? 'checked' : '' %>> 🥅 AET
                   </label>
                 </div>
-                <div id="status-<%= m.id %>" style="text-align:center;font-size:.68rem;color:var(--muted);margin-top:4px">
-                  <%= m.prediction ? '✓ Saved' : '' %>
+                <div id="status-<%= m.id %>" style="text-align:center;font-size:.68rem;margin-top:4px;color:<%= m.prediction ? 'var(--muted)' : '#fbbf24' %>">
+                  <%= m.prediction ? '✓ Saved' : '⚠ No pick yet' %>
                 </div>
                 <% } %>
               </div>
@@ -331,10 +331,9 @@
   overflow: hidden;
   text-overflow: ellipsis;
 }
-.dash-pred-btn:hover { border-color: rgba(255,255,255,.35); color: var(--text); }
-.dash-pred-btn.dpb-a { border-color: var(--blue); background: rgba(59,130,246,.18); color: #60a5fa; font-weight: 700; }
-.dash-pred-btn.dpb-d { border-color: var(--gold); background: rgba(251,191,36,.12); color: var(--gold); font-weight: 700; }
-.dash-pred-btn.dpb-b { border-color: #a78bfa; background: rgba(167,139,250,.18); color: #a78bfa; font-weight: 700; }
+.dash-pred-btn:hover { border-color: rgba(255,255,255,.45); color: var(--text); }
+.dash-pred-btn.dpb-sel { border-color: rgba(255,255,255,.75); background: rgba(255,255,255,.12); color: #fff; font-weight: 700; }
+.match-card.needs-pick { border-left: 3px solid rgba(251,191,36,.5); }
 </style>
 
 <script>
@@ -346,12 +345,12 @@ function selectPred(matchId, val, btn) {
   pendingPreds[matchId].prediction = val;
   // update button highlight
   document.querySelectorAll('[data-match="' + matchId + '"]').forEach(function(b) {
-    b.classList.remove('dpb-a','dpb-d','dpb-b');
+    b.classList.remove('dpb-sel');
   });
-  btn.classList.add(val === 'team_a' ? 'dpb-a' : val === 'draw' ? 'dpb-d' : 'dpb-b');
+  btn.classList.add('dpb-sel');
   // update status label
   var s = document.getElementById('status-' + matchId);
-  if (s) s.textContent = '· unsaved';
+  if (s) { s.textContent = '· unsaved'; s.style.color = '#fbbf24'; }
   updateSaveBtn();
 }
 
