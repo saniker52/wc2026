@@ -212,8 +212,12 @@
               <div class="match-body" style="padding:10px 16px">
                 <div class="match-teams">
                   <div class="team-name team-a" style="font-size:.82rem"><%= m.team_a %></div>
-                  <div class="result-badge">
-                    <% if (m.result === 'draw') { %>🤝<% } else { %>🏆<% } %>
+                  <div style="text-align:center;flex-shrink:0">
+                    <% if (m.score_a !== null && m.score_b !== null) { %>
+                      <div style="font-size:1rem;font-weight:800;color:var(--text);letter-spacing:.05em"><%= m.score_a %> – <%= m.score_b %></div>
+                    <% } else { %>
+                      <div class="result-badge"><%= m.result === 'draw' ? '🤝' : '🏆' %></div>
+                    <% } %>
                   </div>
                   <div class="team-name team-b" style="font-size:.82rem"><%= m.team_b %></div>
                 </div>

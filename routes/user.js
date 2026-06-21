@@ -55,7 +55,7 @@ router.get('/dashboard', requireLogin, (req, res) => {
 
   // Recent results — today and yesterday (KWT) only
   const recent = db.prepare(`
-    SELECT m.*, r.result, r.aet_result, p.prediction, p.aet_prediction
+    SELECT m.*, r.result, r.aet_result, r.score_a, r.score_b, p.prediction, p.aet_prediction
     FROM matches m
     JOIN results r ON r.match_id = m.id
     LEFT JOIN predictions p ON p.match_id = m.id AND p.user_id = ?
