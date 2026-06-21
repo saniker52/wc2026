@@ -43,13 +43,13 @@ router.get('/dashboard', requireLogin, (req, res) => {
   }
   const navFilter = roundFilter === '1=1' ? '' : `AND ${roundFilter}`;
 
-  // Active round matches open for prediction (admin unlocked, no result yet)
+  // All matches open for prediction (admin unlocked, no result yet) — no round filter
   const upcoming = db.prepare(`
     SELECT m.*, r.result, r.aet_result, p.prediction, p.aet_prediction
     FROM matches m
     LEFT JOIN results r ON r.match_id = m.id
     LEFT JOIN predictions p ON p.match_id = m.id AND p.user_id = ?
-    WHERE ${roundFilter} AND m.is_locked = 0 AND r.result IS NULL
+    WHERE m.is_locked = 0 AND r.result IS NULL
     ORDER BY m.match_time ASC
   `).all(userId);
 
