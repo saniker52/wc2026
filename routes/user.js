@@ -71,24 +71,30 @@ router.get('/dashboard', requireLogin, (req, res) => {
     ORDER BY m.match_time ASC LIMIT 1
   `).get(now);
 
-  // ── Matchday window: constrain nav to the active matchday bucket ──────────
+  // ── Active round window: determined by the last match that has kicked off ──
+  // Once the first game of a new round/matchday starts, nav switches to it.
+  const lastStarted = db.prepare(`
+    SELECT id, round, group_name FROM matches WHERE match_time <= ? ORDER BY match_time DESC LIMIT 1
+  `).get(now);
+  const refMatch = lastStarted || nextMatch;
+
   const allGroupIds = db.prepare("SELECT id FROM matches WHERE round='group' ORDER BY match_time, id").all().map(r => r.id);
-  const md1md2Ids  = allGroupIds.slice(0, 48);
-  const md2Ids     = allGroupIds.slice(24, 48);
-  const md3Ids     = allGroupIds.slice(48);
-  const md2AllLocked = md2Ids.length > 0
-    && db.prepare(`SELECT COUNT(*) as c FROM matches WHERE id IN (${md2Ids.join(',')}) AND is_locked=1`).get().c === md2Ids.length;
 
   let navFilter = '';
-  if (nextMatch && nextMatch.round !== 'group') {
-    // KO stage: only the current KO round
-    navFilter = `AND m.round = '${nextMatch.round}'`;
-  } else if (md2AllLocked && md3Ids.length > 0) {
-    // MD3 window (after MD2 fully locked)
-    navFilter = `AND m.id IN (${md3Ids.join(',')})`;
-  } else if (md1md2Ids.length > 0) {
-    // Default: MD1 + MD2
-    navFilter = `AND m.id IN (${md1md2Ids.join(',')})`;
+  if (refMatch) {
+    if (refMatch.round !== 'group') {
+      // KO round: only show that specific round
+      navFilter = `AND m.round = '${refMatch.round}'`;
+    } else {
+      // Group stage: determine which matchday the ref match belongs to
+      const refIdx = allGroupIds.indexOf(refMatch.id);
+      const matchdayIds = refIdx < 24
+        ? allGroupIds.slice(0, 24)
+        : refIdx < 48
+          ? allGroupIds.slice(24, 48)
+          : allGroupIds.slice(48);
+      if (matchdayIds.length > 0) navFilter = `AND m.id IN (${matchdayIds.join(',')})`;
+    }
   }
 
   // Navigable list: today's past/ongoing + upcoming unplayed, within active window
