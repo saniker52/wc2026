@@ -88,19 +88,28 @@ router.get('/dashboard', requireLogin, (req, res) => {
   const myRank = lb.find(r => r.id === userId)?.rank || '-';
   const totalUsers = lb.length;
 
-  // Navigable list: today's past/ongoing + upcoming unplayed, within active window
-  const navList = db.prepare(`
-    SELECT m.id, m.team_a, m.team_b, m.match_time, m.round, m.group_name, m.is_locked,
-           r.result IS NOT NULL as has_result, r.result as match_result
-    FROM matches m
-    LEFT JOIN results r ON r.match_id = m.id
-    WHERE (
-      (date(datetime(m.match_time, '+3 hours')) = ? AND m.match_time <= ?)
-      OR (r.id IS NULL AND m.match_time > ?)
-    ) ${navFilter}
-    ORDER BY m.match_time ASC
-    LIMIT 20
-  `).all(todayKwt, now, now);
+  // Navigable list — admin sees every match across all rounds; users see active window only
+  const isAdmin = req.session.user.is_admin;
+  const navList = isAdmin
+    ? db.prepare(`
+        SELECT m.id, m.team_a, m.team_b, m.match_time, m.round, m.group_name, m.is_locked,
+               r.result IS NOT NULL as has_result, r.result as match_result
+        FROM matches m
+        LEFT JOIN results r ON r.match_id = m.id
+        ORDER BY m.match_time ASC
+      `).all()
+    : db.prepare(`
+        SELECT m.id, m.team_a, m.team_b, m.match_time, m.round, m.group_name, m.is_locked,
+               r.result IS NOT NULL as has_result, r.result as match_result
+        FROM matches m
+        LEFT JOIN results r ON r.match_id = m.id
+        WHERE (
+          (date(datetime(m.match_time, '+3 hours')) = ? AND m.match_time <= ?)
+          OR (r.id IS NULL AND m.match_time > ?)
+        ) ${navFilter}
+        ORDER BY m.match_time ASC
+        LIMIT 20
+      `).all(todayKwt, now, now);
 
   // Current display match: use ?matchId param if valid, else default to nextMatch
   const reqMatchId = req.query.matchId ? parseInt(req.query.matchId) : null;
