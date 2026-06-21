@@ -10,16 +10,48 @@ router.get('/dashboard', requireLogin, (req, res) => {
   const userId = req.session.user.id;
   const now = new Date().toISOString();
 
-  // Upcoming unlocked matches without predictions
+  // Helper: Kuwait date string (YYYY-MM-DD)
+  function kwtDate(iso) {
+    return new Date(new Date(iso).getTime() + 3*60*60*1000).toISOString().slice(0,10);
+  }
+  const todayKwt = kwtDate(now);
+
+  // Absolute next upcoming match
+  const nextMatch = db.prepare(`
+    SELECT m.* FROM matches m
+    LEFT JOIN results r ON r.match_id = m.id
+    WHERE r.id IS NULL AND m.match_time > ?
+    ORDER BY m.match_time ASC LIMIT 1
+  `).get(now);
+
+  // ── Active round window ───────────────────────────────────────────────────
+  const allGroupIds = db.prepare("SELECT id FROM matches WHERE round='group' ORDER BY match_time, id").all().map(r => r.id);
+  const lastStarted = db.prepare(`SELECT id, round FROM matches WHERE match_time <= ? ORDER BY match_time DESC LIMIT 1`).get(now);
+  const refMatch = lastStarted || nextMatch;
+
+  let roundFilter = '1=1'; // bare SQL fragment (no leading AND)
+  if (refMatch) {
+    if (refMatch.round !== 'group') {
+      roundFilter = `m.round = '${refMatch.round}'`;
+    } else {
+      const refIdx = allGroupIds.indexOf(refMatch.id);
+      const mdIds = refIdx < 24 ? allGroupIds.slice(0, 24)
+                  : refIdx < 48 ? allGroupIds.slice(24, 48)
+                  : allGroupIds.slice(48);
+      if (mdIds.length > 0) roundFilter = `m.id IN (${mdIds.join(',')})`;
+    }
+  }
+  const navFilter = roundFilter === '1=1' ? '' : `AND ${roundFilter}`;
+
+  // All matches in the active round — for "Predict Now" section
   const upcoming = db.prepare(`
     SELECT m.*, r.result, r.aet_result, p.prediction, p.aet_prediction
     FROM matches m
     LEFT JOIN results r ON r.match_id = m.id
     LEFT JOIN predictions p ON p.match_id = m.id AND p.user_id = ?
-    WHERE m.is_locked = 0 AND r.result IS NULL AND m.match_time > ?
+    WHERE ${roundFilter}
     ORDER BY m.match_time ASC
-    LIMIT 5
-  `).all(userId, now);
+  `).all(userId);
 
   // Recent results — today and yesterday (KWT) only
   const recent = db.prepare(`
@@ -50,52 +82,11 @@ router.get('/dashboard', requireLogin, (req, res) => {
     totalPts += pts.main + pts.bonus;
   });
 
-  // Rank + full leaderboard for dashboard
+  // Rank + full leaderboard
   const { computeLeaderboard } = require('../db/database');
   const lb = computeLeaderboard(db);
   const myRank = lb.find(r => r.id === userId)?.rank || '-';
   const totalUsers = lb.length;
-
-  // ── Match navigation for leaderboard header ───────────────────────────────
-  // Helper: Kuwait date string (YYYY-MM-DD) from UTC ISO string
-  function kwtDate(iso) {
-    return new Date(new Date(iso).getTime() + 3*60*60*1000).toISOString().slice(0,10);
-  }
-  const todayKwt = kwtDate(now);
-
-  // Absolute next upcoming match (anchor for "today" date)
-  const nextMatch = db.prepare(`
-    SELECT m.* FROM matches m
-    LEFT JOIN results r ON r.match_id = m.id
-    WHERE r.id IS NULL AND m.match_time > ?
-    ORDER BY m.match_time ASC LIMIT 1
-  `).get(now);
-
-  // ── Active round window: determined by the last match that has kicked off ──
-  // Once the first game of a new round/matchday starts, nav switches to it.
-  const lastStarted = db.prepare(`
-    SELECT id, round, group_name FROM matches WHERE match_time <= ? ORDER BY match_time DESC LIMIT 1
-  `).get(now);
-  const refMatch = lastStarted || nextMatch;
-
-  const allGroupIds = db.prepare("SELECT id FROM matches WHERE round='group' ORDER BY match_time, id").all().map(r => r.id);
-
-  let navFilter = '';
-  if (refMatch) {
-    if (refMatch.round !== 'group') {
-      // KO round: only show that specific round
-      navFilter = `AND m.round = '${refMatch.round}'`;
-    } else {
-      // Group stage: determine which matchday the ref match belongs to
-      const refIdx = allGroupIds.indexOf(refMatch.id);
-      const matchdayIds = refIdx < 24
-        ? allGroupIds.slice(0, 24)
-        : refIdx < 48
-          ? allGroupIds.slice(24, 48)
-          : allGroupIds.slice(48);
-      if (matchdayIds.length > 0) navFilter = `AND m.id IN (${matchdayIds.join(',')})`;
-    }
-  }
 
   // Navigable list: today's past/ongoing + upcoming unplayed, within active window
   const navList = db.prepare(`
