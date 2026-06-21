@@ -41,12 +41,12 @@
         <% } else { %>
           <span style="width:36px;flex-shrink:0"></span>
         <% } %>
-        <div style="text-align:center;font-size:.78rem;color:var(--text-dim);flex:1">
-          <% if (displayMatch.has_result) { %>
-            <span style="font-size:.68rem;color:var(--muted);margin-right:4px">✅</span>
-          <% } %>
-          <strong style="color:var(--text)"><%= displayMatch.team_a %> vs <%= displayMatch.team_b %></strong>
-          <% if (!displayMatch.has_result) { %><span style="margin-left:6px;color:var(--muted);font-size:.7rem">⏰ <%= displayMatch.match_time_kwt %></span><% } %>
+        <div style="text-align:center;font-size:.78rem;color:var(--text-dim);flex:1;display:flex;flex-direction:column;align-items:center;gap:2px">
+          <div>
+            <% if (displayMatch.has_result) { %><span style="font-size:.68rem;color:var(--muted);margin-right:4px">✅</span><% } %>
+            <strong style="color:var(--text)"><%= displayMatch.team_a %> vs <%= displayMatch.team_b %></strong>
+          </div>
+          <% if (!displayMatch.has_result) { %><span style="color:var(--muted);font-size:.7rem">⏰ <%= displayMatch.match_time_kwt %></span><% } %>
         </div>
         <% if (nextNavMatch) { %>
           <a href="/dashboard?matchId=<%= nextNavMatch.id %>" class="btn btn-secondary btn-sm" style="padding:3px 10px;font-size:.78rem;flex-shrink:0">→</a>
