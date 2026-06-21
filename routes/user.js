@@ -55,7 +55,14 @@ router.get('/dashboard', requireLogin, (req, res) => {
   const myRank = lb.find(r => r.id === userId)?.rank || '-';
   const totalUsers = lb.length;
 
-  // Next upcoming match (not yet played)
+  // ── Match navigation for leaderboard header ───────────────────────────────
+  // Helper: Kuwait date string (YYYY-MM-DD) from UTC ISO string
+  function kwtDate(iso) {
+    return new Date(new Date(iso).getTime() + 3*60*60*1000).toISOString().slice(0,10);
+  }
+  const todayKwt = kwtDate(now);
+
+  // Absolute next upcoming match (anchor for "today" date)
   const nextMatch = db.prepare(`
     SELECT m.* FROM matches m
     LEFT JOIN results r ON r.match_id = m.id
@@ -63,25 +70,47 @@ router.get('/dashboard', requireLogin, (req, res) => {
     ORDER BY m.match_time ASC LIMIT 1
   `).get(now);
 
-  // Is the next match's round visible to users?
-  let nextMatchRoundVisible = false;
-  if (nextMatch) {
+  // Navigable list: today's past/ongoing matches + upcoming matches (no result yet)
+  const navList = db.prepare(`
+    SELECT m.id, m.team_a, m.team_b, m.match_time, m.round, m.group_name, m.is_locked,
+           r.result IS NOT NULL as has_result
+    FROM matches m
+    LEFT JOIN results r ON r.match_id = m.id
+    WHERE
+      (date(datetime(m.match_time, '+3 hours')) = ? AND m.match_time <= ?)
+      OR (r.id IS NULL AND m.match_time > ?)
+    ORDER BY m.match_time ASC
+    LIMIT 20
+  `).all(todayKwt, now, now);
+
+  // Current display match: use ?matchId param if valid, else default to nextMatch
+  const reqMatchId = req.query.matchId ? parseInt(req.query.matchId) : null;
+  const displayMatch = (reqMatchId && navList.find(m => m.id === reqMatchId))
+    || nextMatch
+    || navList[0] || null;
+
+  const displayIdx = navList.findIndex(m => m.id === displayMatch?.id);
+  const prevNavMatch = displayIdx > 0 ? navList[displayIdx - 1] : null;
+  const nextNavMatch = displayIdx >= 0 && displayIdx < navList.length - 1 ? navList[displayIdx + 1] : null;
+
+  // Visibility check for displayed match's round
+  function getRoundKey(match) {
+    if (match.round !== 'group') return match.round;
     const allGroupIds = db.prepare("SELECT id FROM matches WHERE round='group' ORDER BY match_time, id").all().map(r => r.id);
-    let roundKey = nextMatch.round;
-    if (roundKey === 'group') {
-      const idx = allGroupIds.indexOf(nextMatch.id);
-      roundKey = idx < 24 ? 'group_md1' : idx < 48 ? 'group_md2' : 'group_md3';
-    }
-    const visRow = db.prepare("SELECT visible FROM round_visibility WHERE round = ?").get(roundKey);
-    nextMatchRoundVisible = req.session.user.is_admin || (visRow && visRow.visible === 1);
+    const idx = allGroupIds.indexOf(match.id);
+    return idx < 24 ? 'group_md1' : idx < 48 ? 'group_md2' : 'group_md3';
+  }
+  let displayRoundVisible = req.session.user.is_admin;
+  if (!displayRoundVisible && displayMatch) {
+    const visRow = db.prepare("SELECT visible FROM round_visibility WHERE round = ?").get(getRoundKey(displayMatch));
+    displayRoundVisible = !!(visRow && visRow.visible === 1);
   }
 
-  // All users' predictions for the next match (so we can show per-row in leaderboard)
+  // All users' predictions for the displayed match
   const nextPredMap = {};
-  if (nextMatch) {
-    db.prepare(`
-      SELECT p.user_id, p.prediction FROM predictions p WHERE p.match_id = ?
-    `).all(nextMatch.id).forEach(p => { nextPredMap[p.user_id] = p.prediction; });
+  if (displayMatch) {
+    db.prepare('SELECT user_id, prediction FROM predictions WHERE match_id = ?')
+      .all(displayMatch.id).forEach(p => { nextPredMap[p.user_id] = p.prediction; });
   }
 
   res.render('dashboard', {
@@ -93,9 +122,12 @@ router.get('/dashboard', requireLogin, (req, res) => {
     }),
     stats: { totalPts, groupPts, knockoutPts, bonusPts, correct, rank: myRank, totalUsers },
     leaderboard: lb,
-    nextMatch,
+    nextMatch,         // absolute next game (for auto-refresh check)
+    displayMatch,      // currently navigated match
+    prevNavMatch,
+    nextNavMatch,
     nextPredMap,
-    nextMatchRoundVisible
+    nextMatchRoundVisible: displayRoundVisible
   });
 });
 
@@ -287,6 +319,19 @@ router.post('/matches/:id/predict', requireLogin, (req, res) => {
 
   req.session.flashSuccess = '✅ Prediction saved!';
   res.redirect(returnTo);
+});
+
+// ── API: next match ID (used by dashboard auto-refresh) ───────────────────────
+router.get('/api/next-match', requireLogin, (req, res) => {
+  const db = getDb();
+  const now = new Date().toISOString();
+  const m = db.prepare(`
+    SELECT m.id FROM matches m
+    LEFT JOIN results r ON r.match_id = m.id
+    WHERE r.id IS NULL AND m.match_time > ?
+    ORDER BY m.match_time ASC LIMIT 1
+  `).get(now);
+  res.json({ id: m ? m.id : null });
 });
 
 // ── Rules ─────────────────────────────────────────────────────────────────────

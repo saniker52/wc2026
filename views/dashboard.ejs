@@ -34,10 +34,25 @@
     </div>
 
     <div class="card" style="overflow:hidden;margin-bottom:28px;padding:0">
-      <% if (nextMatch) { %>
-      <div style="padding:8px 14px;background:rgba(255,255,255,.03);border-bottom:1px solid var(--border);font-size:.75rem;color:var(--text-dim)">
-        Next pick shown: <strong style="color:var(--text)"><%= nextMatch.team_a %> vs <%= nextMatch.team_b %></strong>
-        <% if (nextMatch.is_locked) { %><span style="margin-left:6px;color:#f87171">🔒 Locked</span><% } %>
+      <% if (displayMatch) { %>
+      <div style="padding:8px 12px;background:rgba(255,255,255,.03);border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;gap:8px">
+        <% if (prevNavMatch) { %>
+          <a href="/dashboard?matchId=<%= prevNavMatch.id %>" class="btn btn-secondary btn-sm" style="padding:3px 10px;font-size:.78rem;flex-shrink:0">←</a>
+        <% } else { %>
+          <span style="width:36px;flex-shrink:0"></span>
+        <% } %>
+        <div style="text-align:center;font-size:.78rem;color:var(--text-dim);flex:1">
+          <% if (displayMatch.has_result) { %>
+            <span style="font-size:.68rem;color:var(--muted);margin-right:4px">✅</span>
+          <% } %>
+          <strong style="color:var(--text)"><%= displayMatch.team_a %> vs <%= displayMatch.team_b %></strong>
+          <span style="margin-left:6px;color:var(--muted);font-size:.7rem"><%= displayMatch.group_name ? 'Group ' + displayMatch.group_name : displayMatch.round.toUpperCase() %></span>
+        </div>
+        <% if (nextNavMatch) { %>
+          <a href="/dashboard?matchId=<%= nextNavMatch.id %>" class="btn btn-secondary btn-sm" style="padding:3px 10px;font-size:.78rem;flex-shrink:0">→</a>
+        <% } else { %>
+          <span style="width:36px;flex-shrink:0"></span>
+        <% } %>
       </div>
       <% } %>
       <table style="width:100%;border-collapse:collapse;font-size:.88rem">
@@ -54,12 +69,12 @@
           <%
             const isMe = row.id === user.id;
             const medal = row.rank === 1 ? '🥇' : row.rank === 2 ? '🥈' : row.rank === 3 ? '🥉' : '#' + row.rank;
-            const nextPred = nextMatch ? nextPredMap[row.id] : null;
+            const nextPred = displayMatch ? nextPredMap[row.id] : null;
             let nextPredLabel = '—', nextPredColor = 'var(--muted)';
-            if (nextPred && nextMatch) {
+            if (nextPred && displayMatch) {
               if (nextPred === 'draw') { nextPredLabel = 'Draw'; nextPredColor = 'var(--text-dim)'; }
-              else if (nextPred === 'team_a') { nextPredLabel = nextMatch.team_a; nextPredColor = 'var(--blue)'; }
-              else { nextPredLabel = nextMatch.team_b; nextPredColor = '#a78bfa'; }
+              else if (nextPred === 'team_a') { nextPredLabel = displayMatch.team_a; nextPredColor = 'var(--blue)'; }
+              else { nextPredLabel = displayMatch.team_b; nextPredColor = '#a78bfa'; }
             }
             // Show own pick always; show others' picks only when admin has enabled visibility for that round
             const showNextPick = nextPred && (isMe || nextMatchRoundVisible);
@@ -250,6 +265,19 @@
 @media (max-width: 700px) { .dashboard-cols { grid-template-columns: 1fr !important; } }
 .text-red { color: #f87171 !important; }
 </style>
+
+<script>
+// Auto-refresh when the next upcoming match changes (game completed)
+(function() {
+  var knownNextId = <%= nextMatch ? nextMatch.id : 'null' %>;
+  if (!knownNextId) return;
+  setInterval(function() {
+    fetch('/api/next-match').then(function(r){ return r.json(); }).then(function(d) {
+      if (d.id !== knownNextId) { location.replace('/dashboard'); }
+    }).catch(function(){});
+  }, 60000); // check every 60 seconds
+})();
+</script>
 
 <script>
 (function() {
