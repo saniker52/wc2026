@@ -55,6 +55,22 @@ router.get('/dashboard', requireLogin, (req, res) => {
   const myRank = lb.find(r => r.id === userId)?.rank || '-';
   const totalUsers = lb.length;
 
+  // Next upcoming match (not yet played)
+  const nextMatch = db.prepare(`
+    SELECT m.* FROM matches m
+    LEFT JOIN results r ON r.match_id = m.id
+    WHERE r.id IS NULL AND m.match_time > ?
+    ORDER BY m.match_time ASC LIMIT 1
+  `).get(now);
+
+  // All users' predictions for the next match (so we can show per-row in leaderboard)
+  const nextPredMap = {};
+  if (nextMatch) {
+    db.prepare(`
+      SELECT p.user_id, p.prediction FROM predictions p WHERE p.match_id = ?
+    `).all(nextMatch.id).forEach(p => { nextPredMap[p.user_id] = p.prediction; });
+  }
+
   res.render('dashboard', {
     title: 'My Dashboard',
     upcoming: upcoming.map(m => ({ ...m, match_time_kwt: toKuwaitTimeShort(m.match_time) })),
@@ -63,7 +79,9 @@ router.get('/dashboard', requireLogin, (req, res) => {
       return { ...m, match_time_kwt: toKuwaitTimeShort(m.match_time), pts };
     }),
     stats: { totalPts, groupPts, knockoutPts, bonusPts, correct, rank: myRank, totalUsers },
-    leaderboard: lb
+    leaderboard: lb,
+    nextMatch,
+    nextPredMap
   });
 });
 
