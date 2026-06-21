@@ -43,13 +43,13 @@ router.get('/dashboard', requireLogin, (req, res) => {
   }
   const navFilter = roundFilter === '1=1' ? '' : `AND ${roundFilter}`;
 
-  // All matches in the active round — for "Predict Now" section
+  // Active round matches without a result — for "Predict Now" section
   const upcoming = db.prepare(`
     SELECT m.*, r.result, r.aet_result, p.prediction, p.aet_prediction
     FROM matches m
     LEFT JOIN results r ON r.match_id = m.id
     LEFT JOIN predictions p ON p.match_id = m.id AND p.user_id = ?
-    WHERE ${roundFilter}
+    WHERE ${roundFilter} AND r.result IS NULL
     ORDER BY m.match_time ASC
   `).all(userId);
 
