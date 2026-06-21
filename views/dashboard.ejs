@@ -131,15 +131,41 @@
                 <span><%= m.group_name ? `Group ${m.group_name}` : m.round.toUpperCase() %></span>
                 <span>⏰ <%= m.match_time_kwt %></span>
               </div>
-              <div class="match-body">
-                <div class="match-teams">
+              <div class="match-body" style="padding:10px 14px">
+                <div class="match-teams" style="margin-bottom:10px">
                   <div class="team-name team-a"><%= m.team_a %></div>
                   <div class="vs-badge">vs</div>
                   <div class="team-name team-b"><%= m.team_b %></div>
                 </div>
-                <div class="match-actions">
-                  <a href="/matches/<%= m.id %>" class="btn btn-primary btn-sm">Predict</a>
-                </div>
+                <form method="POST" action="/matches/<%= m.id %>/predict">
+                  <input type="hidden" name="_returnTo" value="/dashboard">
+                  <% if (!m.is_knockout) { %>
+                  <div style="display:flex;gap:4px">
+                    <button type="submit" name="prediction" value="team_a" class="dash-pred-btn<%= m.prediction==='team_a' ? ' dpb-a' : '' %>"><%= m.team_a %></button>
+                    <button type="submit" name="prediction" value="draw"   class="dash-pred-btn<%= m.prediction==='draw'   ? ' dpb-d' : '' %>">🤝 Draw</button>
+                    <button type="submit" name="prediction" value="team_b" class="dash-pred-btn<%= m.prediction==='team_b' ? ' dpb-b' : '' %>"><%= m.team_b %></button>
+                  </div>
+                  <% } else { %>
+                  <div style="display:flex;gap:4px;margin-bottom:8px">
+                    <button type="submit" name="prediction" value="team_a" class="dash-pred-btn<%= m.prediction==='team_a' ? ' dpb-a' : '' %>" style="flex:1"><%= m.team_a %></button>
+                    <button type="submit" name="prediction" value="team_b" class="dash-pred-btn<%= m.prediction==='team_b' ? ' dpb-b' : '' %>" style="flex:1"><%= m.team_b %></button>
+                  </div>
+                  <div style="display:flex;gap:16px;justify-content:center;font-size:.75rem;color:var(--text-dim);margin-bottom:6px">
+                    <label style="display:flex;align-items:center;gap:4px;cursor:pointer">
+                      <input type="radio" name="aet_prediction" value="90min" <%= m.aet_prediction==='90min' ? 'checked' : '' %>> ⏱️ 90 min
+                    </label>
+                    <label style="display:flex;align-items:center;gap:4px;cursor:pointer">
+                      <input type="radio" name="aet_prediction" value="aet" <%= m.aet_prediction==='aet' ? 'checked' : '' %>> 🥅 AET
+                    </label>
+                  </div>
+                  <button type="submit" class="btn btn-primary btn-sm" style="width:100%">
+                    <%= m.prediction ? '✏️ Update' : '✅ Save' %>
+                  </button>
+                  <% } %>
+                  <% if (m.prediction && !m.is_knockout) { %>
+                    <div style="text-align:center;font-size:.68rem;color:var(--muted);margin-top:4px">✓ Saved — tap to change</div>
+                  <% } %>
+                </form>
               </div>
             </div>
             <% }) %>
@@ -264,6 +290,27 @@
 <style>
 @media (max-width: 700px) { .dashboard-cols { grid-template-columns: 1fr !important; } }
 .text-red { color: #f87171 !important; }
+
+/* Inline prediction buttons on dashboard */
+.dash-pred-btn {
+  flex: 1;
+  padding: 6px 4px;
+  border-radius: 6px;
+  border: 1px solid var(--border);
+  background: transparent;
+  color: var(--text-dim);
+  font-size: .7rem;
+  cursor: pointer;
+  font-weight: 500;
+  transition: border-color .15s, background .15s, color .15s;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.dash-pred-btn:hover { border-color: rgba(255,255,255,.35); color: var(--text); }
+.dash-pred-btn.dpb-a { border-color: var(--blue); background: rgba(59,130,246,.18); color: #60a5fa; font-weight: 700; }
+.dash-pred-btn.dpb-d { border-color: var(--gold); background: rgba(251,191,36,.12); color: var(--gold); font-weight: 700; }
+.dash-pred-btn.dpb-b { border-color: #a78bfa; background: rgba(167,139,250,.18); color: #a78bfa; font-weight: 700; }
 </style>
 
 <script>

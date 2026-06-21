@@ -21,14 +21,15 @@ router.get('/dashboard', requireLogin, (req, res) => {
     LIMIT 5
   `).all(userId, now);
 
-  // Recent results with user's points
+  // Recent results — today and yesterday (KWT) only
   const recent = db.prepare(`
     SELECT m.*, r.result, r.aet_result, p.prediction, p.aet_prediction
     FROM matches m
     JOIN results r ON r.match_id = m.id
     LEFT JOIN predictions p ON p.match_id = m.id AND p.user_id = ?
-    ORDER BY r.entered_at DESC
-    LIMIT 8
+    WHERE date(datetime(m.match_time, '+3 hours')) >= date(datetime('now', '+3 hours', '-1 day'))
+    ORDER BY m.match_time DESC
+    LIMIT 10
   `).all(userId);
 
   // Total points
@@ -70,15 +71,36 @@ router.get('/dashboard', requireLogin, (req, res) => {
     ORDER BY m.match_time ASC LIMIT 1
   `).get(now);
 
-  // Navigable list: today's past/ongoing matches + upcoming matches (no result yet)
+  // ── Matchday window: constrain nav to the active matchday bucket ──────────
+  const allGroupIds = db.prepare("SELECT id FROM matches WHERE round='group' ORDER BY match_time, id").all().map(r => r.id);
+  const md1md2Ids  = allGroupIds.slice(0, 48);
+  const md2Ids     = allGroupIds.slice(24, 48);
+  const md3Ids     = allGroupIds.slice(48);
+  const md2AllLocked = md2Ids.length > 0
+    && db.prepare(`SELECT COUNT(*) as c FROM matches WHERE id IN (${md2Ids.join(',')}) AND is_locked=1`).get().c === md2Ids.length;
+
+  let navFilter = '';
+  if (nextMatch && nextMatch.round !== 'group') {
+    // KO stage: only the current KO round
+    navFilter = `AND m.round = '${nextMatch.round}'`;
+  } else if (md2AllLocked && md3Ids.length > 0) {
+    // MD3 window (after MD2 fully locked)
+    navFilter = `AND m.id IN (${md3Ids.join(',')})`;
+  } else if (md1md2Ids.length > 0) {
+    // Default: MD1 + MD2
+    navFilter = `AND m.id IN (${md1md2Ids.join(',')})`;
+  }
+
+  // Navigable list: today's past/ongoing + upcoming unplayed, within active window
   const navList = db.prepare(`
     SELECT m.id, m.team_a, m.team_b, m.match_time, m.round, m.group_name, m.is_locked,
            r.result IS NOT NULL as has_result
     FROM matches m
     LEFT JOIN results r ON r.match_id = m.id
-    WHERE
+    WHERE (
       (date(datetime(m.match_time, '+3 hours')) = ? AND m.match_time <= ?)
       OR (r.id IS NULL AND m.match_time > ?)
+    ) ${navFilter}
     ORDER BY m.match_time ASC
     LIMIT 20
   `).all(todayKwt, now, now);
