@@ -476,6 +476,7 @@ function toKuwaitTimeShort(utcDateStr) {
   const d = new Date(utcDateStr);
   return d.toLocaleString('en-US', {
     timeZone: 'Asia/Kuwait',
+    weekday: 'short',
     month: 'short',
     day: 'numeric',
     hour: 'numeric',
