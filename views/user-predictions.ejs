@@ -34,7 +34,6 @@
         <thead>
           <tr style="background:rgba(255,255,255,.04);color:var(--text-dim);font-size:.72rem;text-transform:uppercase;letter-spacing:.04em">
             <th style="padding:9px 12px;text-align:left">Match</th>
-            <th style="padding:9px 12px;text-align:left">Round</th>
             <th style="padding:9px 12px;text-align:center">Prediction</th>
             <th style="padding:9px 12px;text-align:center">Result</th>
           </tr>
@@ -51,9 +50,6 @@
             <td style="padding:9px 12px">
               <div style="font-size:.82rem;font-weight:600"><%= p.team_a %> vs <%= p.team_b %></div>
               <div style="font-size:.72rem;color:var(--text-dim)">⏰ <%= p.match_time_kwt %></div>
-            </td>
-            <td style="padding:9px 12px">
-              <span class="badge badge-<%= p.round === 'group' ? 'group' : 'knockout' %>" style="font-size:.72rem"><%= roundLabel %></span>
             </td>
             <td style="padding:9px 12px;text-align:center">
               <span style="font-weight:600;color:<%= p.prediction === 'team_a' ? 'var(--blue)' : (p.prediction === 'draw' ? 'var(--text-dim)' : '#a78bfa') %>">
