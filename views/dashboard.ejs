@@ -46,7 +46,7 @@
             <span style="font-size:.68rem;color:var(--muted);margin-right:4px">✅</span>
           <% } %>
           <strong style="color:var(--text)"><%= displayMatch.team_a %> vs <%= displayMatch.team_b %></strong>
-          <span style="margin-left:6px;color:var(--muted);font-size:.7rem"><%= displayMatch.group_name ? 'Group ' + displayMatch.group_name : displayMatch.round.toUpperCase() %></span>
+          <% if (!displayMatch.has_result) { %><span style="margin-left:6px;color:var(--muted);font-size:.7rem">⏰ <%= displayMatch.match_time_kwt %></span><% } %>
         </div>
         <% if (nextNavMatch) { %>
           <a href="/dashboard?matchId=<%= nextNavMatch.id %>" class="btn btn-secondary btn-sm" style="padding:3px 10px;font-size:.78rem;flex-shrink:0">→</a>

@@ -70,3 +70,15 @@ app.listen(PORT, () => {
   console.log(`⚽ WC2026 Predictions running on http://localhost:${PORT}`);
   console.log(`   Admin login: admin / admin123 (change after first login!)`);
 });
+
+// ── Auto-sync ESPN scores every 2 minutes ────────────────────────────────────
+const { syncFromESPN } = require('./utils/espnSync');
+const { getDb } = require('./db/database');
+setInterval(async () => {
+  try {
+    const db = getDb();
+    const { synced, error } = await syncFromESPN(db);
+    if (error) { console.warn('[ESPN auto-sync] error:', error); }
+    else if (synced > 0) { console.log(`[ESPN auto-sync] synced ${synced} result(s)`); }
+  } catch (e) { console.warn('[ESPN auto-sync] unexpected error:', e.message); }
+}, 2 * 60 * 1000);

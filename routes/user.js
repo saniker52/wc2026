@@ -123,7 +123,7 @@ router.get('/dashboard', requireLogin, (req, res) => {
     stats: { totalPts, groupPts, knockoutPts, bonusPts, correct, rank: myRank, totalUsers },
     leaderboard: lb,
     nextMatch,         // absolute next game (for auto-refresh check)
-    displayMatch,      // currently navigated match
+    displayMatch: displayMatch ? { ...displayMatch, match_time_kwt: toKuwaitTimeShort(displayMatch.match_time) } : null,
     prevNavMatch,
     nextNavMatch,
     nextPredMap,

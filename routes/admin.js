@@ -2,6 +2,7 @@ const express = require('express');
 const bcrypt = require('bcryptjs');
 const { getDb, computeLeaderboard, toKuwaitTime } = require('../db/database');
 const { requireAdmin } = require('../middleware/auth');
+const { syncFromESPN } = require('../utils/espnSync');
 
 const router = express.Router();
 router.use(requireAdmin);
@@ -447,8 +448,8 @@ router.get('/log', (req, res) => {
 // SYNC SCORES FROM ESPN
 // ════════════════════════════════════════════════════════════════════════════════
 
-// ESPN name → our DB flag name
-const TEAM_MAP = {
+// (TEAM_MAP and sync logic live in utils/espnSync.js)
+const _TEAM_MAP_UNUSED = {
   'Mexico': '🇲🇽 Mexico',
   'Czech Republic': '🇨🇿 Czechia', 'Czechia': '🇨🇿 Czechia',
   'South Korea': '🇰🇷 South Korea',
@@ -501,79 +502,11 @@ const TEAM_MAP = {
 
 router.post('/sync-scores', async (req, res) => {
   const db = getDb();
-  const ESPN_URL = 'https://site.api.espn.com/apis/site/v2/sports/soccer/fifa.world/scoreboard?dates=20260611-20260719&limit=200';
-
-  let espnData;
-  try {
-    const resp = await fetch(ESPN_URL, { signal: AbortSignal.timeout(10000) });
-    espnData = await resp.json();
-  } catch (e) {
-    req.session.flashError = `ESPN fetch failed: ${e.message}`;
+  const { synced, skipped, error } = await syncFromESPN(db);
+  if (error) {
+    req.session.flashError = `ESPN fetch failed: ${error}`;
     return res.redirect('/admin');
   }
-
-  const upsertResult = db.prepare(`
-    INSERT INTO results (match_id, result, aet_result, score_a, score_b) VALUES (?, ?, ?, ?, ?)
-    ON CONFLICT (match_id) DO UPDATE SET result=excluded.result, aet_result=excluded.aet_result, score_a=excluded.score_a, score_b=excluded.score_b, entered_at=CURRENT_TIMESTAMP
-  `);
-
-  const events = espnData.events || [];
-  let synced = 0, skipped = 0;
-
-  for (const event of events) {
-    try {
-      const comp = event.competitions?.[0];
-      if (!comp) { skipped++; continue; }
-
-      const statusType = comp.status?.type;
-      if (!statusType?.completed) { skipped++; continue; }
-
-      const competitors = comp.competitors || [];
-      if (competitors.length !== 2) { skipped++; continue; }
-
-      const home = competitors.find(c => c.homeAway === 'home');
-      const away = competitors.find(c => c.homeAway === 'away');
-      if (!home || !away) { skipped++; continue; }
-
-      const map = n => TEAM_MAP[n];
-      const homeTeam = map(home.team?.displayName) || map(home.team?.name) || map(home.team?.shortDisplayName);
-      const awayTeam = map(away.team?.displayName) || map(away.team?.name) || map(away.team?.shortDisplayName);
-      if (!homeTeam || !awayTeam) { skipped++; continue; }
-
-      // Find match: try home=team_a/away=team_b first, then reversed
-      let match = db.prepare('SELECT * FROM matches WHERE team_a=? AND team_b=?').get(homeTeam, awayTeam);
-      let flipped = false;
-      if (!match) {
-        match = db.prepare('SELECT * FROM matches WHERE team_a=? AND team_b=?').get(awayTeam, homeTeam);
-        flipped = true;
-      }
-      if (!match) { skipped++; continue; }
-
-      const homeScore = parseInt(home.score ?? 0);
-      const awayScore = parseInt(away.score ?? 0);
-
-      // Determine winner from perspective of our DB's team_a / team_b
-      let result;
-      if (!flipped) {
-        result = homeScore > awayScore ? 'team_a' : homeScore < awayScore ? 'team_b' : 'draw';
-      } else {
-        result = awayScore > homeScore ? 'team_a' : awayScore < homeScore ? 'team_b' : 'draw';
-      }
-
-      // Detect AET/penalties from ESPN status detail
-      const detail = (statusType.detail || statusType.shortDetail || '').toLowerCase();
-      const isAET = /extra|aet|penalties|pen\b|pks/i.test(detail);
-      const aetResult = match.is_knockout ? (isAET ? 'aet' : '90min') : null;
-
-      // Scores from ESPN perspective, adjust for team_a/team_b order in our DB
-      const saVal = !flipped ? homeScore : awayScore;
-      const sbVal = !flipped ? awayScore : homeScore;
-      upsertResult.run(match.id, result, aetResult, saVal, sbVal);
-      db.prepare('UPDATE matches SET is_locked=1 WHERE id=?').run(match.id);
-      synced++;
-    } catch (_) { skipped++; }
-  }
-
   logAction(db, req.session.user.id, 'SYNC_SCORES', `Synced ${synced} results, skipped ${skipped}`);
   req.session.flashSuccess = `✅ Sync complete — ${synced} result(s) updated, ${skipped} skipped.`;
   res.redirect('/admin');
