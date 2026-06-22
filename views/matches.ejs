@@ -187,7 +187,7 @@
               const bWon = m.result === 'team_b';
               const isDraw = m.result === 'draw';
             %>
-            <div class="team-name team-a" style="<%= aWon ? 'color:var(--text)' : (m.result && !aWon ? 'opacity:.5' : '') %>">
+            <div class="team-name team-a" style="<%= m.result ? (aWon ? 'color:rgba(255,255,255,.8)' : 'color:rgba(255,255,255,.35)') : '' %>">
               <%= m.team_a %>
             </div>
 
@@ -195,9 +195,6 @@
               <div class="result-badge" style="background:var(--bg);border:1px solid var(--border);border-radius:8px;padding:6px 10px">
                 <% if (m.score_a !== null && m.score_a !== undefined) { %>
                   <div class="result-score"><%= m.score_a %> – <%= m.score_b %></div>
-                <% } %>
-                <% if (isDraw) { %>
-                  <div class="result-outcome" style="color:var(--gold)">DRAW</div>
                 <% } %>
                 <% if (m.aet_result === 'aet') { %>
                   <div class="result-aet">AET</div>
@@ -207,7 +204,7 @@
               <div class="vs-badge">vs</div>
             <% } %>
 
-            <div class="team-name team-b" style="<%= bWon ? 'color:var(--text)' : (m.result && !bWon ? 'opacity:.5' : '') %>">
+            <div class="team-name team-b" style="<%= m.result ? (bWon ? 'color:rgba(255,255,255,.8)' : 'color:rgba(255,255,255,.35)') : '' %>">
               <%= m.team_b %>
             </div>
           </div>
@@ -224,11 +221,11 @@
                   <span class="prediction-pill incorrect">❌ Wrong</span>
                 <% } %>
                 <span style="font-size:.7rem;color:var(--muted)">
-                  <%= m.prediction === 'team_a' ? m.team_a.split(' ')[0] : (m.prediction === 'draw' ? '🤝' : m.team_b.split(' ')[0]) %>
+                  Prediction: <%= m.prediction === 'team_a' ? m.team_a.split(' ')[0] : (m.prediction === 'draw' ? '🤝' : m.team_b.split(' ')[0]) %>
                 </span>
               <% } %>
               <% if (m.tally) { %>
-                <span style="font-size:.7rem;color:var(--muted)"><%= m.tally.correct %>/<%= m.tally.total %> ✓</span>
+                <span style="font-size:.7rem;color:var(--muted)">All picks: <%= m.tally.correct %>/<%= m.tally.total %> ✓</span>
               <% } %>
 
             <% } else if (m.is_locked) { %>
