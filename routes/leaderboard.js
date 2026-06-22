@@ -10,10 +10,15 @@ router.get('/', requireLogin, (req, res) => {
   const rows = all.map(r => ({ ...r, display_total: r.total }));
   const myId = req.session.user.id;
 
+  const now = new Date().toISOString();
+  const koStarted = db.prepare("SELECT id FROM matches WHERE round != 'group' AND match_time <= ? LIMIT 1").get(now);
+  const currentStage = koStarted ? 'ko' : 'group';
+
   res.render('leaderboard', {
     title: 'Leaderboard',
     rows,
     myId,
+    currentStage,
     updatedAt: new Date().toLocaleString('en-KW', { timeZone: 'Asia/Kuwait' })
   });
 });

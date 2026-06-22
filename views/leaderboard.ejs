@@ -29,7 +29,7 @@
               <th></th>
               <th style="padding:4px 6px;text-align:center;color:var(--muted)">Pts</th>
               <th style="padding:4px 6px;text-align:center;color:var(--muted);border-left:1px solid var(--border)">Pts</th>
-              <th style="padding:4px 6px;text-align:center;color:var(--gold)">Bonus</th>
+              <th style="padding:4px 6px;text-align:center;color:var(--muted)">Bonus</th>
               <th style="border-left:1px solid var(--border)"></th>
             </tr>
           </thead>
@@ -43,9 +43,9 @@
                 <strong style="color:<%= r.id===myId ? 'var(--gold)' : 'var(--text)' %>"><%= r.display_name %></strong>
                 <% if (r.id===myId) { %><span style="font-size:.65rem;color:var(--accent);margin-left:4px">you</span><% } %>
               </td>
-              <td style="padding:10px 6px;text-align:center;color:var(--text-dim)"><%= r.group_pts %></td>
-              <td style="padding:10px 6px;text-align:center;color:var(--text-dim);border-left:1px solid var(--border)"><%= r.knockout_pts %></td>
-              <td style="padding:10px 6px;text-align:center;color:var(--gold)"><%= r.bonus_pts || '—' %></td>
+              <td style="padding:10px 6px;text-align:center;color:<%= currentStage==='group' ? 'var(--text)' : 'var(--text-dim)' %>"><%= r.group_pts %></td>
+              <td style="padding:10px 6px;text-align:center;color:<%= currentStage==='ko' ? 'var(--text)' : 'var(--text-dim)' %>;border-left:1px solid var(--border)"><%= r.knockout_pts %></td>
+              <td style="padding:10px 6px;text-align:center;color:<%= currentStage==='ko' ? 'var(--text)' : 'var(--text-dim)' %>"><%= r.bonus_pts || '—' %></td>
               <td style="padding:10px 10px;text-align:right;font-weight:800;font-size:.95rem;color:<%= r.id===myId ? 'var(--gold)' : 'var(--text)' %>;border-left:1px solid var(--border)"><%= r.total %></td>
             </tr>
             <% }) %>
