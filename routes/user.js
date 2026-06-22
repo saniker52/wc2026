@@ -296,6 +296,11 @@ router.get('/matches', requireLogin, (req, res) => {
   const tallyMap = {};
   tallyRows.forEach(r => { tallyMap[r.id] = { correct: r.correct_count, total: r.pred_count }; });
 
+  // Round visibility map for "View all picks" button
+  const visRows = db.prepare('SELECT round, visible FROM round_visibility').all();
+  const visMap = {};
+  visRows.forEach(r => { visMap[r.round] = r.visible === 1; });
+
   res.render('matches', {
     title: 'Match Predictions',
     matches: matches.map(m => {
@@ -303,7 +308,11 @@ router.get('/matches', requireLogin, (req, res) => {
       const timeRank = m.group_name ? (groupRanks[m.id] || 0) : 0;
       const matchday = timeRank <= 24 ? 1 : timeRank <= 48 ? 2 : 3;
       const officialNum = m.group_name ? timeRank : (KO_OFFSETS[m.round] || 0) + m.match_num;
-      return { ...m, match_time_kwt: toKuwaitTime(m.match_time), pts, matchday, officialNum, tally: tallyMap[m.id] || null };
+      const roundKey = m.group_name
+        ? (timeRank <= 24 ? 'group_md1' : timeRank <= 48 ? 'group_md2' : 'group_md3')
+        : m.round;
+      const picksVisible = !!(visMap[roundKey]);
+      return { ...m, match_time_kwt: toKuwaitTime(m.match_time), pts, matchday, officialNum, tally: tallyMap[m.id] || null, roundKey, picksVisible };
     }),
     filter: { round, group },
     groups: 'ABCDEFGHIJKL'.split('')
@@ -484,8 +493,16 @@ router.get('/api/match/:id/predictions', requireLogin, (req, res) => {
   `).get(matchId);
 
   if (!match) return res.json({ ok: false });
-  // Non-admins can only view completed matches
-  if (!isAdmin && !match.result) return res.json({ ok: false });
+
+  if (!isAdmin && !match.result) {
+    // Check if admin has enabled picks visibility for this round
+    const gids = db.prepare("SELECT id FROM matches WHERE round='group' ORDER BY match_time, id").all().map(r => r.id);
+    const idx = gids.indexOf(matchId);
+    const roundKey = match.round !== 'group' ? match.round
+      : idx < 24 ? 'group_md1' : idx < 48 ? 'group_md2' : 'group_md3';
+    const vis = db.prepare("SELECT visible FROM round_visibility WHERE round = ?").get(roundKey);
+    if (!vis || !vis.visible) return res.json({ ok: false });
+  }
 
   const preds = db.prepare(`
     SELECT u.id, u.display_name, p.prediction, p.aet_prediction

@@ -260,7 +260,7 @@
         </div>
 
         <%/* ── View all picks button ── */%>
-        <% if (m.result || user.is_admin) { %>
+        <% if (m.result || user.is_admin || m.picksVisible) { %>
         <div style="padding:0 14px 10px;text-align:right">
           <button
             onclick="openPicksModal(this)"
