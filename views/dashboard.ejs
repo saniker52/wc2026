@@ -12,6 +12,7 @@
         👋 <span style="color:var(--gold)"><%= user.display_name %></span>
         <span style="font-size:.9rem;font-weight:500;color:var(--text-dim)">· Chalet 1267 – WC 2026</span>
       </h1>
+      <% if (!user.is_admin) { %>
       <div style="display:flex;gap:14px;margin-top:14px;flex-wrap:wrap">
         <div class="stat-card" style="flex:1;min-width:130px">
           <div class="stat-value" style="color:var(--gold)">🏆 #<%= stats.rank %></div>
@@ -22,6 +23,7 @@
           <div class="stat-label">Current Points</div>
         </div>
       </div>
+      <% } %>
     </div>
 
     <!-- Full leaderboard table -->
@@ -152,9 +154,8 @@
                   <%
                     const st = u.stages[s];
                     let cell, color;
-                    if (st.total === 0) { cell = '—'; color = 'var(--muted)'; }
-                    else if (st.done >= st.total) { cell = '✓'; color = 'var(--green)'; }
-                    else { cell = (st.total - st.done) + ' left'; color = '#fbbf24'; }
+                    if (st.done >= st.total && st.total > 0) { cell = '✓'; color = 'var(--green)'; }
+                    else { cell = '—'; color = 'var(--muted)'; }
                   %>
                   <td style="padding:9px 6px;text-align:center;font-size:.75rem;font-weight:600;color:<%= color %>"><%= cell %></td>
                   <% }) %>
@@ -298,6 +299,94 @@
       </div>
 
     </div>
+
+    <% if (user.is_admin && lockStatus) { %>
+    <!-- Admin: Lock / Unlock Predictions -->
+    <div style="margin-top:28px">
+      <div class="section-header" style="margin-bottom:12px">
+        <div>
+          <div class="section-title">🔒 Lock / Unlock Predictions</div>
+          <div class="section-subtitle">Control prediction access per round</div>
+        </div>
+        <form method="POST" action="/admin/sync-scores" onsubmit="this.querySelector('button').textContent='Syncing…';this.querySelector('button').disabled=true">
+          <button type="submit" class="btn btn-sm" style="background:#059669;border-color:#059669;color:#fff">🔄 Sync ESPN</button>
+        </form>
+      </div>
+      <div class="card" style="padding:0;overflow:hidden">
+        <div style="overflow-x:auto">
+          <table style="width:100%;border-collapse:collapse;font-size:.8rem;min-width:400px">
+            <thead>
+              <tr style="background:rgba(255,255,255,.04);color:var(--text-dim);font-size:.68rem;text-transform:uppercase;letter-spacing:.04em">
+                <th style="padding:8px 10px;text-align:left">Round</th>
+                <th style="padding:8px 8px;text-align:center">Status</th>
+                <th style="padding:8px 8px;text-align:center">Picks Visible</th>
+                <th style="padding:8px 10px;text-align:right">Actions</th>
+              </tr>
+            </thead>
+            <tbody>
+              <%
+                const adminRounds = [
+                  { key: 'group_md1', label: 'Group MD1', dot: '#ef4444' },
+                  { key: 'group_md2', label: 'Group MD2', dot: '#3b82f6' },
+                  { key: 'group_md3', label: 'Group MD3', dot: '#22c55e' },
+                  { key: 'r32',   label: 'R32'   },
+                  { key: 'r16',   label: 'R16'   },
+                  { key: 'qf',    label: 'QF'    },
+                  { key: 'sf',    label: 'SF'    },
+                  { key: '3rd',   label: '3rd Place' },
+                  { key: 'final', label: 'Final' },
+                ];
+              %>
+              <% adminRounds.forEach((r, i) => {
+                const ls = lockStatus[r.key] || { total: 0, locked: 0 };
+                const allLocked = ls.total > 0 && ls.locked === ls.total;
+                const noneLocked = ls.locked === 0;
+                const isVisible = visibilityStatus[r.key] === 1;
+              %>
+              <tr style="border-top:1px solid var(--border);<%= i%2===1?'background:rgba(255,255,255,.015)':'' %>">
+                <td style="padding:9px 10px;font-weight:600;color:var(--text);display:flex;align-items:center;gap:6px">
+                  <% if (r.dot) { %><span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:<%= r.dot %>"></span><% } else { %><span style="font-size:.8rem">🏆</span><% } %>
+                  <%= r.label %>
+                </td>
+                <td style="padding:9px 8px;text-align:center;font-size:.75rem">
+                  <% if (ls.total === 0) { %>
+                    <span style="color:var(--muted)">—</span>
+                  <% } else if (allLocked) { %>
+                    <span style="color:#f87171;font-weight:600">🔒 Locked</span>
+                  <% } else if (noneLocked) { %>
+                    <span style="color:var(--green);font-weight:600">🔓 Open</span>
+                  <% } else { %>
+                    <span style="color:var(--gold)"><%= ls.locked %>/<%= ls.total %></span>
+                  <% } %>
+                </td>
+                <td style="padding:9px 8px;text-align:center">
+                  <form method="POST" action="/admin/rounds/<%= r.key %>/visibility" style="display:inline-flex;align-items:center;gap:4px">
+                    <% if (isVisible) { %>
+                      <span style="font-size:.72rem;color:var(--green)">👁 On</span>
+                      <button type="submit" name="action" value="hide" class="btn btn-sm" style="background:rgba(239,68,68,.15);color:#f87171;border-color:#f87171;font-size:.68rem;padding:2px 7px">Hide</button>
+                    <% } else { %>
+                      <span style="font-size:.72rem;color:var(--muted)">🙈 Off</span>
+                      <button type="submit" name="action" value="show" class="btn btn-sm" style="background:rgba(34,197,94,.15);color:#4ade80;border-color:#4ade80;font-size:.68rem;padding:2px 7px">Show</button>
+                    <% } %>
+                  </form>
+                </td>
+                <td style="padding:9px 10px;text-align:right">
+                  <% if (ls.total > 0) { %>
+                  <form method="POST" action="/admin/matches/lock-round" style="display:inline-flex;gap:5px">
+                    <input type="hidden" name="round" value="<%= r.key %>">
+                    <button type="submit" name="action" value="lock" class="btn btn-danger btn-sm" style="font-size:.72rem;padding:3px 8px">🔒</button>
+                    <button type="submit" name="action" value="unlock" class="btn btn-success btn-sm" style="font-size:.72rem;padding:3px 8px">🔓</button>
+                  </form>
+                  <% } %>
+                </td>
+              </tr>
+              <% }) %>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+    <% } %>
 
     <div class="mt-24">
       <a href="/rules" class="btn btn-secondary">📋 Rules</a>

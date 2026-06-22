@@ -141,6 +141,30 @@ router.get('/dashboard', requireLogin, (req, res) => {
       .all(displayMatch.id).forEach(p => { nextPredMap[p.user_id] = p.prediction; });
   }
 
+  // ── Admin: lock/unlock status per round ──────────────────────────────────
+  let lockStatus = null, visibilityStatus = null;
+  if (isAdmin) {
+    const gids = db.prepare("SELECT id FROM matches WHERE round='group' ORDER BY match_time, id").all().map(r => r.id);
+    const md1Ids = gids.slice(0, 24), md2Ids = gids.slice(24, 48), md3Ids = gids.slice(48);
+    const ic = ids => ids.length ? ids.join(',') : '0';
+    const rndQ  = r => db.prepare(`SELECT COUNT(*) as c FROM matches WHERE round=?`).get(r).c;
+    const rndQL = r => db.prepare(`SELECT COUNT(*) as c FROM matches WHERE round=? AND is_locked=1`).get(r).c;
+    lockStatus = {
+      group_md1: { total: md1Ids.length, locked: db.prepare(`SELECT COUNT(*) as c FROM matches WHERE id IN (${ic(md1Ids)}) AND is_locked=1`).get().c },
+      group_md2: { total: md2Ids.length, locked: db.prepare(`SELECT COUNT(*) as c FROM matches WHERE id IN (${ic(md2Ids)}) AND is_locked=1`).get().c },
+      group_md3: { total: md3Ids.length, locked: db.prepare(`SELECT COUNT(*) as c FROM matches WHERE id IN (${ic(md3Ids)}) AND is_locked=1`).get().c },
+      r32:   { total: rndQ('r32'),   locked: rndQL('r32')   },
+      r16:   { total: rndQ('r16'),   locked: rndQL('r16')   },
+      qf:    { total: rndQ('qf'),    locked: rndQL('qf')    },
+      sf:    { total: rndQ('sf'),    locked: rndQL('sf')    },
+      '3rd': { total: rndQ('3rd'),   locked: rndQL('3rd')   },
+      final: { total: rndQ('final'), locked: rndQL('final') },
+    };
+    const visRows = db.prepare('SELECT round, visible FROM round_visibility').all();
+    visibilityStatus = {};
+    visRows.forEach(r => { visibilityStatus[r.round] = r.visible; });
+  }
+
   // ── Admin: missing predictions per user per stage ─────────────────────────
   let missingPreds = null;
   if (isAdmin) {
@@ -195,7 +219,9 @@ router.get('/dashboard', requireLogin, (req, res) => {
     nextNavMatch,
     nextPredMap,
     nextMatchRoundVisible: displayRoundVisible,
-    missingPreds
+    missingPreds,
+    lockStatus,
+    visibilityStatus
   });
 });
 
