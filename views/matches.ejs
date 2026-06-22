@@ -230,7 +230,7 @@
 
             <% } else if (m.is_locked) { %>
               <%/* ── Locked, no result yet ── */%>
-              <span class="prediction-pill locked">🔒 Locked</span>
+              <% if (user.is_admin) { %><span class="prediction-pill locked">🔒 Locked</span><% } %>
               <% if (m.prediction) { %>
                 <span class="prediction-pill saved" style="font-size:.75rem">
                   <%= m.prediction === 'team_a' ? m.team_a.split(' ')[0] : (m.prediction === 'draw' ? '🤝 Draw' : m.team_b.split(' ')[0]) %>
