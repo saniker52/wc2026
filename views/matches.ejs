@@ -162,8 +162,6 @@
         }
         // Stadium country flag based on city
         const cityFlag = m.city && m.city.includes('Mexico') ? '🇲🇽' : m.city && m.city.includes('Canada') ? '🇨🇦' : '🇺🇸';
-        // Matchday color (group only)
-        const mdColor = m.matchday === 1 ? '#ef4444' : m.matchday === 2 ? '#3b82f6' : '#22c55e';
       %>
       <div class="match-card <%= cardClass %>" id="card-<%= m.id %>" data-played="<%= m.result ? '1' : '0' %>">
 
@@ -171,10 +169,9 @@
         <div class="match-header">
           <div style="display:flex;align-items:center;gap:6px;min-width:0;flex:1">
             <% if (m.group_name) { %>
-              <span style="display:inline-flex;align-items:center;justify-content:center;width:18px;height:18px;border-radius:50%;background:<%= mdColor %>;font-size:.6rem;font-weight:800;color:#fff;flex-shrink:0" title="Matchday <%= m.matchday %>">M<%= m.matchday %></span>
-              <span class="match-round-badge group">Group <%= m.group_name %></span>
+              <span style="font-size:.65rem;color:var(--muted)">Group <%= m.group_name %> · MD<%= m.matchday %></span>
             <% } else { %>
-              <span class="match-round-badge knockout"><%= m.round.toUpperCase() %></span>
+              <span style="font-size:.65rem;color:var(--muted)"><%= m.round.toUpperCase() %></span>
             <% } %>
             <span class="match-num-badge">#<%= m.officialNum %></span>
             <span style="color:var(--text-dim);font-size:.73rem;overflow:hidden;text-overflow:ellipsis;white-space:nowrap"><%= cityFlag %>&nbsp;<%= m.stadium %></span>
@@ -190,7 +187,7 @@
               const bWon = m.result === 'team_b';
               const isDraw = m.result === 'draw';
             %>
-            <div class="team-name team-a" style="<%= aWon ? 'color:var(--green)' : (m.result && !aWon ? 'opacity:.5' : '') %>">
+            <div class="team-name team-a" style="<%= aWon ? 'color:var(--text)' : (m.result && !aWon ? 'opacity:.5' : '') %>">
               <%= m.team_a %>
             </div>
 
@@ -199,9 +196,9 @@
                 <% if (m.score_a !== null && m.score_a !== undefined) { %>
                   <div class="result-score"><%= m.score_a %> – <%= m.score_b %></div>
                 <% } %>
-                <div class="result-outcome" style="color:<%= isDraw ? 'var(--gold)' : 'var(--green)' %>">
-                  <%= isDraw ? 'DRAW' : 'WIN' %>
-                </div>
+                <% if (isDraw) { %>
+                  <div class="result-outcome" style="color:var(--gold)">DRAW</div>
+                <% } %>
                 <% if (m.aet_result === 'aet') { %>
                   <div class="result-aet">AET</div>
                 <% } %>
@@ -210,7 +207,7 @@
               <div class="vs-badge">vs</div>
             <% } %>
 
-            <div class="team-name team-b" style="<%= bWon ? 'color:var(--green)' : (m.result && !bWon ? 'opacity:.5' : '') %>">
+            <div class="team-name team-b" style="<%= bWon ? 'color:var(--text)' : (m.result && !bWon ? 'opacity:.5' : '') %>">
               <%= m.team_b %>
             </div>
           </div>
@@ -229,8 +226,9 @@
                 <span style="font-size:.7rem;color:var(--muted)">
                   <%= m.prediction === 'team_a' ? m.team_a.split(' ')[0] : (m.prediction === 'draw' ? '🤝' : m.team_b.split(' ')[0]) %>
                 </span>
-              <% } else { %>
-                <span class="prediction-pill locked">No pred</span>
+              <% } %>
+              <% if (m.tally) { %>
+                <span style="font-size:.7rem;color:var(--muted)"><%= m.tally.correct %>/<%= m.tally.total %> ✓</span>
               <% } %>
 
             <% } else if (m.is_locked) { %>

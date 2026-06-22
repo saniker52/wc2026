@@ -272,6 +272,21 @@ router.get('/matches', requireLogin, (req, res) => {
 
   const matches = db.prepare(query).all(...params);
 
+  // Correct-guess tally per match (non-admin users only)
+  const tallyRows = db.prepare(`
+    SELECT m.id,
+      SUM(CASE WHEN p.prediction IS NOT NULL AND u.is_admin = 0 THEN 1 ELSE 0 END) as pred_count,
+      SUM(CASE WHEN p.prediction = r.result AND u.is_admin = 0 THEN 1 ELSE 0 END) as correct_count
+    FROM matches m
+    JOIN results r ON r.match_id = m.id
+    LEFT JOIN predictions p ON p.match_id = m.id
+    LEFT JOIN users u ON u.id = p.user_id
+    WHERE r.result IS NOT NULL
+    GROUP BY m.id
+  `).all();
+  const tallyMap = {};
+  tallyRows.forEach(r => { tallyMap[r.id] = { correct: r.correct_count, total: r.pred_count }; });
+
   res.render('matches', {
     title: 'Match Predictions',
     matches: matches.map(m => {
@@ -279,7 +294,7 @@ router.get('/matches', requireLogin, (req, res) => {
       const timeRank = m.group_name ? (groupRanks[m.id] || 0) : 0;
       const matchday = timeRank <= 24 ? 1 : timeRank <= 48 ? 2 : 3;
       const officialNum = m.group_name ? timeRank : (KO_OFFSETS[m.round] || 0) + m.match_num;
-      return { ...m, match_time_kwt: toKuwaitTime(m.match_time), pts, matchday, officialNum };
+      return { ...m, match_time_kwt: toKuwaitTime(m.match_time), pts, matchday, officialNum, tally: tallyMap[m.id] || null };
     }),
     filter: { round, group },
     groups: 'ABCDEFGHIJKL'.split('')

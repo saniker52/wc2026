@@ -45,7 +45,6 @@
         <% } %>
         <div style="text-align:center;font-size:.78rem;color:var(--text-dim);flex:1;display:flex;flex-direction:column;align-items:center;gap:2px">
           <div>
-            <% if (displayMatch.has_result) { %><span style="font-size:.68rem;color:var(--muted);margin-right:4px">✅</span><% } %>
             <strong style="color:var(--text)"><%= displayMatch.team_a %> vs <%= displayMatch.team_b %></strong>
           </div>
           <% if (displayMatch.has_result) { %>
@@ -54,7 +53,7 @@
                 ? 'Draw'
                 : 'Win (' + (displayMatch.match_result === 'team_a' ? displayMatch.team_a : displayMatch.team_b) + ')';
             %>
-            <span style="color:var(--muted);font-size:.68rem">Result: <%= rLabel %></span>
+            <span style="color:var(--muted);font-size:.68rem">✅ Result: <%= rLabel %></span>
             <% if (correctTally) { %>
               <span style="color:var(--muted);font-size:.65rem"><%= correctTally.correct %>/<%= correctTally.total %> correct</span>
             <% } %>
