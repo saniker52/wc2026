@@ -222,7 +222,7 @@ router.post('/rounds/:round/visibility', (req, res) => {
   const label = labels[req.params.round] || req.params.round;
   logAction(db, req.session.user.id, action === 'show' ? 'SHOW_PREDICTIONS' : 'HIDE_PREDICTIONS', `${label} predictions now ${action === 'show' ? 'visible' : 'hidden'} to users`);
   req.session.flashSuccess = `${label}: predictions ${action === 'show' ? '👁 visible' : '🙈 hidden'} to users.`;
-  res.redirect('/admin');
+  res.redirect(req.get('Referer') || '/admin');
 });
 
 // ════════════════════════════════════════════════════════════════════════════════
