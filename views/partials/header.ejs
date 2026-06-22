@@ -20,10 +20,10 @@
 
     <div class="navbar-menu">
       <ul class="navbar-nav">
-        <li><a href="/dashboard" class="<%= locals.currentPage === 'dashboard' ? 'active' : '' %>">Dashboard</a></li>
-        <li><a href="/matches"   class="<%= locals.currentPage === 'matches'   ? 'active' : '' %>">Matches</a></li>
+        <li><a href="/dashboard"   class="<%= locals.currentPage === 'dashboard'   ? 'active' : '' %>">Dashboard</a></li>
         <li><a href="/leaderboard" class="<%= locals.currentPage === 'leaderboard' ? 'active' : '' %>">Leaderboard</a></li>
-        <li><a href="/rules"     class="<%= locals.currentPage === 'rules'     ? 'active' : '' %>">Rules</a></li>
+        <li><a href="/matches"     class="<%= locals.currentPage === 'matches'     ? 'active' : '' %>">Matches</a></li>
+        <li><a href="/rules"       class="<%= locals.currentPage === 'rules'       ? 'active' : '' %>">Rules</a></li>
         <% if (user.is_admin) { %><li><a href="/admin" style="color:#f87171">Admin</a></li><% } %>
       </ul>
       <div class="navbar-user">

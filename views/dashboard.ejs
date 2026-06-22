@@ -81,7 +81,7 @@
             const nextPred = displayMatch ? nextPredMap[row.id] : null;
             let nextPredLabel = '—', nextPredColor = 'var(--muted)';
             if (nextPred && displayMatch) {
-              if (nextPred === 'draw') { nextPredLabel = 'Draw'; nextPredColor = 'var(--text-dim)'; }
+              if (nextPred === 'draw') { nextPredLabel = '🤝 Draw'; nextPredColor = 'var(--text)'; }
               else if (nextPred === 'team_a') { nextPredLabel = displayMatch.team_a; nextPredColor = 'var(--text)'; }
               else { nextPredLabel = displayMatch.team_b; nextPredColor = 'var(--text)'; }
             }

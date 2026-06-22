@@ -3,72 +3,63 @@
 <div class="page">
   <div class="container">
 
-    <div class="section-header">
+    <div class="section-header" style="margin-bottom:16px">
       <div>
         <div class="section-title">🏆 Leaderboard</div>
         <div class="section-subtitle">Updated: <%= updatedAt %> (Kuwait Time)</div>
       </div>
     </div>
 
-    <!-- Filter tabs -->
-    <div class="lb-filters">
-      <a href="/leaderboard" class="lb-filter-btn <%= filter === 'overall' ? 'active' : '' %>">🌍 Overall</a>
-      <a href="/leaderboard?filter=group"   class="lb-filter-btn <%= filter === 'group'   ? 'active' : '' %>">Group Stage</a>
-      <a href="/leaderboard?filter=knockout" class="lb-filter-btn <%= filter === 'knockout' ? 'active' : '' %>">Knockout Stage</a>
-    </div>
-
     <div class="card" style="padding:0;overflow:hidden">
       <% if (rows.length === 0) { %>
-        <div class="text-center text-muted" style="padding:40px">No users to show yet.</div>
+        <div class="text-center text-muted" style="padding:40px">No players yet.</div>
       <% } else { %>
-      <table class="leaderboard-table">
-        <thead>
-          <tr>
-            <th style="width:50px">#</th>
-            <th>Player</th>
-            <th class="text-right"><%= filter === 'overall' ? 'Total Pts' : (filter === 'group' ? 'Group Pts' : 'KO + Bonus') %></th>
-            <% if (filter === 'overall') { %>
-            <th class="text-right" style="display:table-cell">Group</th>
-            <th class="text-right" style="display:table-cell">Knockout</th>
-            <th class="text-right" style="display:table-cell">Bonus</th>
-            <% } %>
-            <th class="text-right">✅ Correct</th>
-          </tr>
-        </thead>
-        <tbody>
-          <% rows.forEach(r => { %>
-          <tr class="<%= r.id === myId ? 'me' : '' %> rank-<%= r.rank %>">
-            <td class="rank-cell">
-              <% if (r.rank === 1) { %>🥇
-              <% } else if (r.rank === 2) { %>🥈
-              <% } else if (r.rank === 3) { %>🥉
-              <% } else { %><%= r.rank %>
-              <% } %>
-            </td>
-            <td>
-              <strong><%= r.display_name %></strong>
-              <% if (r.id === myId) { %><span class="me-tag">You</span><% } %>
-            </td>
-            <td class="text-right total-pts"><%= r.display_total %></td>
-            <% if (filter === 'overall') { %>
-            <td class="text-right text-muted"><%= r.group_pts %></td>
-            <td class="text-right text-muted"><%= r.knockout_pts %></td>
-            <td class="text-right" style="color:var(--gold)"><%= r.bonus_pts %></td>
-            <% } %>
-            <td class="text-right"><%= r.correct %></td>
-          </tr>
-          <% }) %>
-        </tbody>
-      </table>
+      <div style="overflow-x:auto">
+        <table style="width:100%;border-collapse:collapse;font-size:.82rem;min-width:340px">
+          <thead>
+            <tr style="background:rgba(255,255,255,.04);color:var(--text-dim);font-size:.7rem;text-transform:uppercase;letter-spacing:.04em">
+              <th style="padding:8px 10px;text-align:left;width:36px">#</th>
+              <th style="padding:8px 10px;text-align:left">Player</th>
+              <th style="padding:8px 6px;text-align:center">Group</th>
+              <th colspan="2" style="padding:8px 6px;text-align:center;border-left:1px solid var(--border)">KO Stage</th>
+              <th style="padding:8px 10px;text-align:right;border-left:1px solid var(--border)">Total</th>
+            </tr>
+            <tr style="background:rgba(255,255,255,.02);color:var(--text-dim);font-size:.66rem;text-transform:uppercase;letter-spacing:.03em">
+              <th></th>
+              <th></th>
+              <th style="padding:4px 6px;text-align:center;color:var(--muted)">Pts</th>
+              <th style="padding:4px 6px;text-align:center;color:var(--muted);border-left:1px solid var(--border)">Pts</th>
+              <th style="padding:4px 6px;text-align:center;color:var(--gold)">Bonus</th>
+              <th style="border-left:1px solid var(--border)"></th>
+            </tr>
+          </thead>
+          <tbody>
+            <% rows.forEach((r, i) => { %>
+            <tr style="border-top:1px solid var(--border);<%= r.id === myId ? 'background:rgba(59,130,246,.12);' : (i%2===0?'':'background:rgba(255,255,255,.015);') %>">
+              <td style="padding:10px 10px;font-weight:700;color:<%= r.rank<=3 ? 'var(--gold)' : 'var(--text-dim)' %>">
+                <% if (r.rank===1) { %>🥇<% } else if (r.rank===2) { %>🥈<% } else if (r.rank===3) { %>🥉<% } else { %><%= r.rank %><% } %>
+              </td>
+              <td style="padding:10px 10px">
+                <strong style="color:<%= r.id===myId ? 'var(--gold)' : 'var(--text)' %>"><%= r.display_name %></strong>
+                <% if (r.id===myId) { %><span style="font-size:.65rem;color:var(--accent);margin-left:4px">you</span><% } %>
+              </td>
+              <td style="padding:10px 6px;text-align:center;color:var(--text-dim)"><%= r.group_pts %></td>
+              <td style="padding:10px 6px;text-align:center;color:var(--text-dim);border-left:1px solid var(--border)"><%= r.knockout_pts %></td>
+              <td style="padding:10px 6px;text-align:center;color:var(--gold)"><%= r.bonus_pts || '—' %></td>
+              <td style="padding:10px 10px;text-align:right;font-weight:800;font-size:.95rem;color:<%= r.id===myId ? 'var(--gold)' : 'var(--text)' %>;border-left:1px solid var(--border)"><%= r.total %></td>
+            </tr>
+            <% }) %>
+          </tbody>
+        </table>
+      </div>
       <% } %>
     </div>
 
-    <!-- Scoring reminder -->
-    <div class="card mt-24" style="padding:16px 20px">
-      <div style="font-size:.82rem;color:var(--text-dim);display:flex;flex-wrap:wrap;gap:16px;align-items:center">
-        <span>📋 <strong style="color:var(--text)">Scoring:</strong></span>
-        <span>Group: 1pt · R32: 2pts · R16: 3pts · QF: 4pts · SF: 5pts · Final: 6pts</span>
-        <span>⭐ +1 bonus for correct AET prediction (knockout only)</span>
+    <div class="card mt-24" style="padding:14px 18px">
+      <div style="font-size:.78rem;color:var(--text-dim);line-height:1.7">
+        📋 <strong style="color:var(--text)">Scoring:</strong>
+        Group 1pt · R32 2pts · R16 3pts · QF 4pts · SF 5pts · Final 6pts
+        · <span style="color:var(--gold)">⭐ +1 AET bonus (knockout)</span>
       </div>
     </div>
 
