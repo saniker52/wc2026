@@ -140,7 +140,9 @@
               <thead>
                 <tr style="background:rgba(255,255,255,.04);color:var(--text-dim);font-size:.68rem;text-transform:uppercase;letter-spacing:.04em">
                   <th style="padding:8px 10px;text-align:left">Player</th>
-                  <th style="padding:8px 6px;text-align:center">Group</th>
+                  <th style="padding:8px 6px;text-align:center">MD1</th>
+                  <th style="padding:8px 6px;text-align:center">MD2</th>
+                  <th style="padding:8px 6px;text-align:center">MD3</th>
                   <th style="padding:8px 6px;text-align:center">R32</th>
                   <th style="padding:8px 6px;text-align:center">R16</th>
                   <th style="padding:8px 6px;text-align:center">QF</th>
@@ -152,7 +154,7 @@
                 <% missingPreds.forEach((u, i) => { %>
                 <tr style="border-top:1px solid var(--border);<%= i%2===0?'':'background:rgba(255,255,255,.015);' %>">
                   <td style="padding:9px 10px;font-weight:600;color:var(--text)"><%= u.display_name %></td>
-                  <% ['group','r32','r16','qf','sf','final'].forEach(function(s) { %>
+                  <% ['group_md1','group_md2','group_md3','r32','r16','qf','sf','final'].forEach(function(s) { %>
                   <%
                     const st = u.stages[s];
                     let cell, color;
@@ -165,7 +167,7 @@
                 </tr>
                 <% }) %>
                 <% if (missingPreds.length === 0) { %>
-                <tr><td colspan="7" style="padding:20px;text-align:center;color:var(--text-dim)">No players yet.</td></tr>
+                <tr><td colspan="9" style="padding:20px;text-align:center;color:var(--text-dim)">No players yet.</td></tr>
                 <% } %>
               </tbody>
             </table>

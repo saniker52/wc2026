@@ -185,28 +185,37 @@ router.get('/dashboard', requireLogin, (req, res) => {
   // ── Admin: missing predictions per user per stage ─────────────────────────
   let missingPreds = null;
   if (isAdmin) {
-    const STAGES = ['group', 'r32', 'r16', 'qf', 'sf', 'final'];
-    const stageCounts = {};
-    STAGES.forEach(s => {
-      stageCounts[s] = db.prepare("SELECT COUNT(*) as cnt FROM matches WHERE round = ?").get(s).cnt;
-    });
+    const gids = db.prepare("SELECT id FROM matches WHERE round='group' ORDER BY match_time, id").all().map(r => r.id);
+    const md1Ids = gids.slice(0, 24), md2Ids = gids.slice(24, 48), md3Ids = gids.slice(48);
+    const ic = ids => ids.length ? ids.join(',') : '0';
+
+    const STAGES = ['group_md1', 'group_md2', 'group_md3', 'r32', 'r16', 'qf', 'sf', 'final'];
+    const stageCounts = {
+      group_md1: md1Ids.length, group_md2: md2Ids.length, group_md3: md3Ids.length,
+      r32: db.prepare("SELECT COUNT(*) as c FROM matches WHERE round='r32'").get().c,
+      r16: db.prepare("SELECT COUNT(*) as c FROM matches WHERE round='r16'").get().c,
+      qf:  db.prepare("SELECT COUNT(*) as c FROM matches WHERE round='qf'").get().c,
+      sf:  db.prepare("SELECT COUNT(*) as c FROM matches WHERE round='sf'").get().c,
+      final: db.prepare("SELECT COUNT(*) as c FROM matches WHERE round='final'").get().c,
+    };
 
     const allUsers = db.prepare(
       "SELECT id, display_name FROM users WHERE is_admin = 0 ORDER BY display_name ASC"
     ).all();
 
-    const predRows = db.prepare(`
-      SELECT p.user_id, m.round, COUNT(p.id) as cnt
-      FROM predictions p
-      JOIN matches m ON m.id = p.match_id
-      WHERE p.prediction IS NOT NULL
-      GROUP BY p.user_id, m.round
-    `).all();
-
+    // Count predictions per user per matchday/round
     const predMap = {};
-    predRows.forEach(r => {
-      if (!predMap[r.user_id]) predMap[r.user_id] = {};
-      predMap[r.user_id][r.round] = r.cnt;
+    const addCounts = (rows, stageKey) => {
+      rows.forEach(r => {
+        if (!predMap[r.user_id]) predMap[r.user_id] = {};
+        predMap[r.user_id][stageKey] = r.cnt;
+      });
+    };
+    if (md1Ids.length) addCounts(db.prepare(`SELECT user_id, COUNT(*) as cnt FROM predictions WHERE match_id IN (${ic(md1Ids)}) AND prediction IS NOT NULL GROUP BY user_id`).all(), 'group_md1');
+    if (md2Ids.length) addCounts(db.prepare(`SELECT user_id, COUNT(*) as cnt FROM predictions WHERE match_id IN (${ic(md2Ids)}) AND prediction IS NOT NULL GROUP BY user_id`).all(), 'group_md2');
+    if (md3Ids.length) addCounts(db.prepare(`SELECT user_id, COUNT(*) as cnt FROM predictions WHERE match_id IN (${ic(md3Ids)}) AND prediction IS NOT NULL GROUP BY user_id`).all(), 'group_md3');
+    ['r32', 'r16', 'qf', 'sf', 'final'].forEach(round => {
+      addCounts(db.prepare(`SELECT p.user_id, COUNT(*) as cnt FROM predictions p JOIN matches m ON m.id = p.match_id WHERE m.round = ? AND p.prediction IS NOT NULL GROUP BY p.user_id`).all(round), round);
     });
 
     missingPreds = allUsers.map(u => ({
