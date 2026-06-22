@@ -104,12 +104,13 @@ router.get('/dashboard', requireLogin, (req, res) => {
         FROM matches m
         LEFT JOIN results r ON r.match_id = m.id
         WHERE (
-          (date(datetime(m.match_time, '+3 hours')) = ? AND m.match_time <= ?)
-          OR (r.id IS NULL AND m.match_time > ?)
-        ) ${navFilter}
+          (date(datetime(m.match_time, '+3 hours')) >= date(datetime('now', '+3 hours', '-2 days'))
+           AND m.match_time <= ?)
+          OR (r.id IS NULL AND m.match_time > ? ${navFilter})
+        )
         ORDER BY m.match_time ASC
-        LIMIT 20
-      `).all(todayKwt, now, now);
+        LIMIT 60
+      `).all(now, now);
 
   // Current display match: use ?matchId param if valid, else default to nextMatch
   const reqMatchId = req.query.matchId ? parseInt(req.query.matchId) : null;
@@ -139,6 +140,22 @@ router.get('/dashboard', requireLogin, (req, res) => {
   if (displayMatch) {
     db.prepare('SELECT user_id, prediction FROM predictions WHERE match_id = ?')
       .all(displayMatch.id).forEach(p => { nextPredMap[p.user_id] = p.prediction; });
+  }
+
+  // Correct-guess tally for completed display match
+  let correctTally = null;
+  if (displayMatch && displayMatch.has_result && displayMatch.match_result) {
+    const totalPredicted = db.prepare(`
+      SELECT COUNT(*) as cnt FROM predictions p
+      JOIN users u ON u.id = p.user_id
+      WHERE p.match_id = ? AND u.is_admin = 0 AND p.prediction IS NOT NULL
+    `).get(displayMatch.id).cnt;
+    const correctCount = db.prepare(`
+      SELECT COUNT(*) as cnt FROM predictions p
+      JOIN users u ON u.id = p.user_id
+      WHERE p.match_id = ? AND u.is_admin = 0 AND p.prediction = ?
+    `).get(displayMatch.id, displayMatch.match_result).cnt;
+    correctTally = { correct: correctCount, total: totalPredicted };
   }
 
   // ── Admin: lock/unlock status per round ──────────────────────────────────
@@ -221,7 +238,8 @@ router.get('/dashboard', requireLogin, (req, res) => {
     nextMatchRoundVisible: displayRoundVisible,
     missingPreds,
     lockStatus,
-    visibilityStatus
+    visibilityStatus,
+    correctTally
   });
 });
 

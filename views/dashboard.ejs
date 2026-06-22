@@ -55,6 +55,9 @@
                 : 'Win (' + (displayMatch.match_result === 'team_a' ? displayMatch.team_a : displayMatch.team_b) + ')';
             %>
             <span style="color:var(--muted);font-size:.68rem">Result: <%= rLabel %></span>
+            <% if (correctTally) { %>
+              <span style="color:var(--muted);font-size:.65rem"><%= correctTally.correct %>/<%= correctTally.total %> correct</span>
+            <% } %>
           <% } else { %>
             <span style="color:var(--muted);font-size:.7rem">⏰ <%= displayMatch.match_time_kwt %></span>
           <% } %>
