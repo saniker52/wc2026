@@ -158,7 +158,7 @@
                     let cell, color;
                     if (st.total === 0) { cell = '—'; color = 'var(--muted)'; }
                     else if (st.done >= st.total) { cell = '✓'; color = 'var(--green)'; }
-                    else { cell = (st.total - st.done) + ' missing'; color = 'rgba(255,255,255,.45)'; }
+                    else { cell = st.done + '/' + st.total; color = 'rgba(255,255,255,.45)'; }
                   %>
                   <td style="padding:9px 6px;text-align:center;font-size:.75rem;font-weight:600;color:<%= color %>"><%= cell %></td>
                   <% }) %>
