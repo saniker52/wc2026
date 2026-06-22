@@ -259,6 +259,20 @@
           </div>
         </div>
 
+        <%/* ── View all picks button ── */%>
+        <% if (m.result || user.is_admin) { %>
+        <div style="padding:0 14px 10px;text-align:right">
+          <button
+            onclick="openPicksModal(this)"
+            data-id="<%= m.id %>"
+            data-team-a="<%= m.team_a.replace(/"/g, '&quot;') %>"
+            data-team-b="<%= m.team_b.replace(/"/g, '&quot;') %>"
+            style="font-size:.7rem;color:var(--muted);background:none;border:none;cursor:pointer;padding:0;text-decoration:underline">
+            View all picks →
+          </button>
+        </div>
+        <% } %>
+
         <%/* ── Inline prediction form ── */%>
         <% if (!m.result && !m.is_locked && !user.is_admin) { %>
         <div id="predict-form-<%= m.id %>" class="predict-form" style="display:none">
@@ -385,6 +399,73 @@ function scrollToRecent() {
   const first = document.querySelector('.match-card[data-played="0"]');
   if (first) { first.scrollIntoView({ behavior: 'smooth', block: 'center' }); }
 }
+
+// ── All picks modal ───────────────────────────────────────────────────────────
+async function openPicksModal(btn) {
+  const matchId = btn.dataset.id;
+  const teamA   = btn.dataset.teamA;
+  const teamB   = btn.dataset.teamB;
+
+  document.getElementById('picks-modal-title').textContent = teamA + ' vs ' + teamB;
+  document.getElementById('picks-modal-body').innerHTML =
+    '<div style="text-align:center;padding:24px;color:var(--muted)">Loading…</div>';
+  document.getElementById('picks-overlay').style.display = 'block';
+  document.getElementById('picks-modal').style.display   = 'block';
+  document.body.style.overflow = 'hidden';
+
+  try {
+    const r    = await fetch('/api/match/' + matchId + '/predictions');
+    const data = await r.json();
+    if (!data.ok) {
+      document.getElementById('picks-modal-body').innerHTML =
+        '<div style="color:var(--muted);text-align:center;padding:20px">Not available.</div>';
+      return;
+    }
+    const result = data.result;
+    const rows = data.preds.map((p, i) => {
+      let predLabel = '<span style="color:var(--muted)">—</span>';
+      let icon = '';
+      if (p.prediction) {
+        const name = p.prediction === 'team_a' ? teamA : p.prediction === 'draw' ? '🤝 Draw' : teamB;
+        predLabel = '<span style="color:var(--text)">' + name + '</span>';
+        if (result) icon = p.prediction === result ? '✅' : '❌';
+      }
+      const bg = i % 2 === 1 ? 'background:rgba(255,255,255,.015)' : '';
+      return '<tr style="border-top:1px solid var(--border);' + bg + '">'
+        + '<td style="padding:9px 12px;font-weight:500;color:var(--text);font-size:.85rem">' + p.display_name + '</td>'
+        + '<td style="padding:9px 12px;font-size:.85rem">' + predLabel + '</td>'
+        + '<td style="padding:9px 12px;text-align:center;font-size:.9rem">' + icon + '</td>'
+        + '</tr>';
+    }).join('');
+
+    document.getElementById('picks-modal-body').innerHTML =
+      '<table style="width:100%;border-collapse:collapse">'
+      + '<thead><tr style="background:rgba(255,255,255,.04);color:var(--text-dim);font-size:.68rem;text-transform:uppercase;letter-spacing:.04em">'
+      + '<th style="padding:8px 12px;text-align:left">Player</th>'
+      + '<th style="padding:8px 12px;text-align:left">Pick</th>'
+      + '<th style="padding:8px 12px;text-align:center">' + (result ? 'Result' : '') + '</th>'
+      + '</tr></thead><tbody>' + rows + '</tbody></table>';
+  } catch(e) {
+    document.getElementById('picks-modal-body').innerHTML =
+      '<div style="color:var(--muted);text-align:center;padding:20px">Error loading picks.</div>';
+  }
+}
+
+function closePicksModal() {
+  document.getElementById('picks-overlay').style.display = 'none';
+  document.getElementById('picks-modal').style.display   = 'none';
+  document.body.style.overflow = '';
+}
 </script>
+
+<!-- All picks modal -->
+<div id="picks-overlay" onclick="closePicksModal()" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.72);z-index:900"></div>
+<div id="picks-modal" style="display:none;position:fixed;bottom:0;left:0;right:0;z-index:901;background:var(--surface);border-top:1px solid var(--border);border-radius:18px 18px 0 0;max-height:80vh;overflow-y:auto">
+  <div style="position:sticky;top:0;background:var(--surface);padding:16px 16px 12px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between">
+    <div id="picks-modal-title" style="font-weight:700;font-size:.95rem;color:var(--text)"></div>
+    <button onclick="closePicksModal()" style="background:none;border:none;color:var(--text-dim);font-size:1.3rem;cursor:pointer;line-height:1">✕</button>
+  </div>
+  <div id="picks-modal-body" style="padding-bottom:16px"></div>
+</div>
 
 <%- include('partials/footer') %>

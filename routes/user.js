@@ -461,6 +461,34 @@ router.get('/api/next-match', requireLogin, (req, res) => {
   res.json({ id: m ? m.id : null });
 });
 
+// ── API: all predictions for a match (modal) ─────────────────────────────────
+router.get('/api/match/:id/predictions', requireLogin, (req, res) => {
+  const db = getDb();
+  const matchId = parseInt(req.params.id);
+  const isAdmin = req.session.user.is_admin;
+
+  const match = db.prepare(`
+    SELECT m.*, r.result, r.aet_result
+    FROM matches m
+    LEFT JOIN results r ON r.match_id = m.id
+    WHERE m.id = ?
+  `).get(matchId);
+
+  if (!match) return res.json({ ok: false });
+  // Non-admins can only view completed matches
+  if (!isAdmin && !match.result) return res.json({ ok: false });
+
+  const preds = db.prepare(`
+    SELECT u.id, u.display_name, p.prediction, p.aet_prediction
+    FROM users u
+    LEFT JOIN predictions p ON p.user_id = u.id AND p.match_id = ?
+    WHERE u.is_admin = 0
+    ORDER BY u.display_name ASC
+  `).all(matchId);
+
+  res.json({ ok: true, result: match.result, preds });
+});
+
 // ── Rules ─────────────────────────────────────────────────────────────────────
 router.get('/rules', requireLogin, (req, res) => {
   res.render('rules', { title: 'Competition Rules' });
