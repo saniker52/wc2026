@@ -141,6 +141,45 @@ router.get('/dashboard', requireLogin, (req, res) => {
       .all(displayMatch.id).forEach(p => { nextPredMap[p.user_id] = p.prediction; });
   }
 
+  // ── Admin: missing predictions per user per stage ─────────────────────────
+  let missingPreds = null;
+  if (isAdmin) {
+    const STAGES = ['group', 'r32', 'r16', 'qf', 'sf', 'final'];
+    const stageCounts = {};
+    STAGES.forEach(s => {
+      stageCounts[s] = db.prepare("SELECT COUNT(*) as cnt FROM matches WHERE round = ?").get(s).cnt;
+    });
+
+    const allUsers = db.prepare(
+      "SELECT id, display_name FROM users WHERE is_admin = 0 ORDER BY display_name ASC"
+    ).all();
+
+    const predRows = db.prepare(`
+      SELECT p.user_id, m.round, COUNT(p.id) as cnt
+      FROM predictions p
+      JOIN matches m ON m.id = p.match_id
+      WHERE p.prediction IS NOT NULL
+      GROUP BY p.user_id, m.round
+    `).all();
+
+    const predMap = {};
+    predRows.forEach(r => {
+      if (!predMap[r.user_id]) predMap[r.user_id] = {};
+      predMap[r.user_id][r.round] = r.cnt;
+    });
+
+    missingPreds = allUsers.map(u => ({
+      id: u.id,
+      display_name: u.display_name,
+      stages: STAGES.reduce((acc, s) => {
+        const done = (predMap[u.id] || {})[s] || 0;
+        const total = stageCounts[s];
+        acc[s] = { done, total };
+        return acc;
+      }, {})
+    }));
+  }
+
   res.render('dashboard', {
     title: 'My Dashboard',
     upcoming: upcoming.map(m => ({ ...m, match_time_kwt: toKuwaitTimeShort(m.match_time) })),
@@ -155,7 +194,8 @@ router.get('/dashboard', requireLogin, (req, res) => {
     prevNavMatch,
     nextNavMatch,
     nextPredMap,
-    nextMatchRoundVisible: displayRoundVisible
+    nextMatchRoundVisible: displayRoundVisible,
+    missingPreds
   });
 });
 
