@@ -135,33 +135,13 @@
     <% if (flashSuccess) { %><div class="flash flash-success">✅ <%- flashSuccess %></div><% } %>
     <% if (flashError)   { %><div class="flash flash-error">⚠️ <%- flashError %></div><% } %>
 
-    <div class="section-header">
+    <div class="section-header" style="margin-bottom:16px">
       <div>
         <div class="section-title">⚽ Match Predictions</div>
         <div class="section-subtitle"><%= matches.length %> matches · All times in Kuwait Time (KWT)</div>
       </div>
+      <button onclick="scrollToRecent()" class="btn btn-secondary btn-sm">Go to Recent →</button>
     </div>
-
-    <!-- Round filters -->
-    <div class="tabs mb-16">
-      <a href="/matches"              class="tab-btn <%= !filter.round && !filter.group ? 'active' : '' %>">All</a>
-      <a href="/matches?round=group"  class="tab-btn <%= filter.round === 'group' ? 'active' : '' %>">Groups</a>
-      <a href="/matches?round=r32"    class="tab-btn <%= filter.round === 'r32'   ? 'active' : '' %>">R32</a>
-      <a href="/matches?round=r16"    class="tab-btn <%= filter.round === 'r16'   ? 'active' : '' %>">R16</a>
-      <a href="/matches?round=qf"     class="tab-btn <%= filter.round === 'qf'    ? 'active' : '' %>">QF</a>
-      <a href="/matches?round=sf"     class="tab-btn <%= filter.round === 'sf'    ? 'active' : '' %>">SF</a>
-      <a href="/matches?round=final"  class="tab-btn <%= filter.round === 'final' ? 'active' : '' %>">Final</a>
-    </div>
-
-    <!-- Group sub-filter -->
-    <% if (!filter.round || filter.round === 'group') { %>
-    <div class="lb-filters mb-16">
-      <a href="/matches?round=group" class="lb-filter-btn <%= filter.round === 'group' && !filter.group ? 'active' : '' %>">All Groups</a>
-      <% groups.forEach(g => { %>
-        <a href="/matches?group=<%= g %>" class="lb-filter-btn <%= filter.group === g ? 'active' : '' %>">Group <%= g %></a>
-      <% }) %>
-    </div>
-    <% } %>
 
     <% if (matches.length === 0) { %>
       <div class="card text-center" style="padding:40px">
@@ -185,7 +165,7 @@
         // Matchday color (group only)
         const mdColor = m.matchday === 1 ? '#ef4444' : m.matchday === 2 ? '#3b82f6' : '#22c55e';
       %>
-      <div class="match-card <%= cardClass %>" id="card-<%= m.id %>">
+      <div class="match-card <%= cardClass %>" id="card-<%= m.id %>" data-played="<%= m.result ? '1' : '0' %>">
 
         <!-- Card header: matchday dot + group badge + match# + stadium + time -->
         <div class="match-header">
@@ -404,6 +384,11 @@ function togglePredictForm(id) {
   const isOpen = form.style.display !== 'none';
   document.querySelectorAll('.predict-form').forEach(f => f.style.display = 'none');
   if (!isOpen) { form.style.display = 'block'; form.scrollIntoView({ behavior: 'smooth', block: 'nearest' }); }
+}
+
+function scrollToRecent() {
+  const first = document.querySelector('.match-card[data-played="0"]');
+  if (first) { first.scrollIntoView({ behavior: 'smooth', block: 'center' }); }
 }
 </script>
 
