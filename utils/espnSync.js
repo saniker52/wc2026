@@ -78,8 +78,9 @@ async function syncFromESPN(db) {
   `);
 
   const events = espnData.events || [];
-  let synced = 0, skipped = 0;
+  let synced = 0, skipped = 0, teamsUpdated = 0;
 
+  // ── Pass 1: sync completed match results ─────────────────────────────────
   for (const event of events) {
     try {
       const comp = event.competitions?.[0];
@@ -130,7 +131,50 @@ async function syncFromESPN(db) {
     } catch (_) { skipped++; }
   }
 
-  return { synced, skipped, error: null };
+  // ── Pass 2: update team names for upcoming knockout matches ───────────────
+  for (const event of events) {
+    try {
+      const comp = event.competitions?.[0];
+      if (!comp) continue;
+
+      const statusType = comp.status?.type;
+      if (statusType?.completed) continue; // already handled in pass 1
+
+      const competitors = comp.competitors || [];
+      if (competitors.length !== 2) continue;
+
+      const home = competitors.find(c => c.homeAway === 'home');
+      const away = competitors.find(c => c.homeAway === 'away');
+      if (!home || !away) continue;
+
+      const map = n => TEAM_MAP[n];
+      const homeTeam = map(home.team?.displayName) || map(home.team?.name) || map(home.team?.shortDisplayName);
+      const awayTeam = map(away.team?.displayName) || map(away.team?.name) || map(away.team?.shortDisplayName);
+      if (!homeTeam || !awayTeam) continue; // TBD — teams not yet determined
+
+      // If this exact pairing already exists in DB, nothing to update
+      const exactMatch = db.prepare(
+        'SELECT id FROM matches WHERE (team_a=? AND team_b=?) OR (team_a=? AND team_b=?)'
+      ).get(homeTeam, awayTeam, awayTeam, homeTeam);
+      if (exactMatch) continue;
+
+      // Find the corresponding knockout match by time (±20 min window)
+      const eventTime = new Date(event.date || comp.date);
+      if (isNaN(eventTime.getTime())) continue;
+      const tMin = new Date(eventTime.getTime() - 20 * 60 * 1000).toISOString();
+      const tMax = new Date(eventTime.getTime() + 20 * 60 * 1000).toISOString();
+
+      const match = db.prepare(
+        `SELECT * FROM matches WHERE round != 'group' AND match_time BETWEEN ? AND ?`
+      ).get(tMin, tMax);
+      if (!match) continue;
+
+      db.prepare('UPDATE matches SET team_a=?, team_b=? WHERE id=?').run(homeTeam, awayTeam, match.id);
+      teamsUpdated++;
+    } catch (_) {}
+  }
+
+  return { synced, skipped, teamsUpdated, error: null };
 }
 
 module.exports = { syncFromESPN };

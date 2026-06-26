@@ -77,8 +77,11 @@ const { getDb } = require('./db/database');
 setInterval(async () => {
   try {
     const db = getDb();
-    const { synced, error } = await syncFromESPN(db);
+    const { synced, teamsUpdated, error } = await syncFromESPN(db);
     if (error) { console.warn('[ESPN auto-sync] error:', error); }
-    else if (synced > 0) { console.log(`[ESPN auto-sync] synced ${synced} result(s)`); }
+    else {
+      if (synced > 0) console.log(`[ESPN auto-sync] synced ${synced} result(s)`);
+      if (teamsUpdated > 0) console.log(`[ESPN auto-sync] updated ${teamsUpdated} team name(s)`);
+    }
   } catch (e) { console.warn('[ESPN auto-sync] unexpected error:', e.message); }
 }, 2 * 60 * 1000);

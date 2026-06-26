@@ -189,13 +189,14 @@ router.get('/dashboard', requireLogin, (req, res) => {
     const md1Ids = gids.slice(0, 24), md2Ids = gids.slice(24, 48), md3Ids = gids.slice(48);
     const ic = ids => ids.length ? ids.join(',') : '0';
 
-    const STAGES = ['group_md1', 'group_md2', 'group_md3', 'r32', 'r16', 'qf', 'sf', 'final'];
+    const STAGES = ['group_md1', 'group_md2', 'group_md3', 'r32', 'r16', 'qf', 'sf', '3rd', 'final'];
     const stageCounts = {
       group_md1: md1Ids.length, group_md2: md2Ids.length, group_md3: md3Ids.length,
-      r32: db.prepare("SELECT COUNT(*) as c FROM matches WHERE round='r32'").get().c,
-      r16: db.prepare("SELECT COUNT(*) as c FROM matches WHERE round='r16'").get().c,
-      qf:  db.prepare("SELECT COUNT(*) as c FROM matches WHERE round='qf'").get().c,
-      sf:  db.prepare("SELECT COUNT(*) as c FROM matches WHERE round='sf'").get().c,
+      r32:   db.prepare("SELECT COUNT(*) as c FROM matches WHERE round='r32'").get().c,
+      r16:   db.prepare("SELECT COUNT(*) as c FROM matches WHERE round='r16'").get().c,
+      qf:    db.prepare("SELECT COUNT(*) as c FROM matches WHERE round='qf'").get().c,
+      sf:    db.prepare("SELECT COUNT(*) as c FROM matches WHERE round='sf'").get().c,
+      '3rd': db.prepare("SELECT COUNT(*) as c FROM matches WHERE round='3rd'").get().c,
       final: db.prepare("SELECT COUNT(*) as c FROM matches WHERE round='final'").get().c,
     };
 
@@ -214,7 +215,7 @@ router.get('/dashboard', requireLogin, (req, res) => {
     if (md1Ids.length) addCounts(db.prepare(`SELECT user_id, COUNT(*) as cnt FROM predictions WHERE match_id IN (${ic(md1Ids)}) AND prediction IS NOT NULL GROUP BY user_id`).all(), 'group_md1');
     if (md2Ids.length) addCounts(db.prepare(`SELECT user_id, COUNT(*) as cnt FROM predictions WHERE match_id IN (${ic(md2Ids)}) AND prediction IS NOT NULL GROUP BY user_id`).all(), 'group_md2');
     if (md3Ids.length) addCounts(db.prepare(`SELECT user_id, COUNT(*) as cnt FROM predictions WHERE match_id IN (${ic(md3Ids)}) AND prediction IS NOT NULL GROUP BY user_id`).all(), 'group_md3');
-    ['r32', 'r16', 'qf', 'sf', 'final'].forEach(round => {
+    ['r32', 'r16', 'qf', 'sf', '3rd', 'final'].forEach(round => {
       addCounts(db.prepare(`SELECT p.user_id, COUNT(*) as cnt FROM predictions p JOIN matches m ON m.id = p.match_id WHERE m.round = ? AND p.prediction IS NOT NULL GROUP BY p.user_id`).all(round), round);
     });
 
