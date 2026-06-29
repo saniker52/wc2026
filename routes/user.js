@@ -138,8 +138,8 @@ router.get('/dashboard', requireLogin, (req, res) => {
   // All users' predictions for the displayed match
   const nextPredMap = {};
   if (displayMatch) {
-    db.prepare('SELECT user_id, prediction FROM predictions WHERE match_id = ?')
-      .all(displayMatch.id).forEach(p => { nextPredMap[p.user_id] = p.prediction; });
+    db.prepare('SELECT user_id, prediction, aet_prediction FROM predictions WHERE match_id = ?')
+      .all(displayMatch.id).forEach(p => { nextPredMap[p.user_id] = { prediction: p.prediction, aet_prediction: p.aet_prediction }; });
   }
 
   // Correct-guess tally for completed display match

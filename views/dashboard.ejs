@@ -82,12 +82,15 @@
           <%
             const isMe = row.id === user.id;
             const medal = row.rank === 1 ? '🥇' : row.rank === 2 ? '🥈' : row.rank === 3 ? '🥉' : '#' + row.rank;
-            const nextPred = displayMatch ? nextPredMap[row.id] : null;
-            let nextPredLabel = '—', nextPredColor = 'var(--muted)';
+            const nextPredObj = displayMatch ? nextPredMap[row.id] : null;
+            const nextPred = nextPredObj ? nextPredObj.prediction : null;
+            const nextAet  = nextPredObj ? nextPredObj.aet_prediction : null;
+            let nextPredLabel = '—', nextPredColor = 'var(--muted)', nextAetLabel = '';
             if (nextPred && displayMatch) {
               if (nextPred === 'draw') { nextPredLabel = '🤝 Draw'; nextPredColor = 'var(--text)'; }
               else if (nextPred === 'team_a') { nextPredLabel = displayMatch.team_a; nextPredColor = 'var(--text)'; }
               else { nextPredLabel = displayMatch.team_b; nextPredColor = 'var(--text)'; }
+              if (nextAet) nextAetLabel = nextAet === 'aet' ? 'AET' : '90\'';
             }
             // Show own pick always; show others' picks only when admin has enabled visibility for that round
             const showNextPick = nextPred && (isMe || nextMatchRoundVisible);
@@ -106,6 +109,7 @@
             <td style="padding:10px 12px;text-align:center;font-size:.82rem">
               <% if (showNextPick) { %>
                 <span style="color:<%= nextPredColor %>;font-weight:600"><%= nextPredLabel %></span>
+                <% if (nextAetLabel) { %><span style="color:var(--muted);font-size:.7rem;margin-left:4px"><%= nextAetLabel %></span><% } %>
               <% } else if (nextMatch && !nextPred) { %>
                 <span style="color:var(--muted);font-size:.72rem">No pick</span>
               <% } else { %>
