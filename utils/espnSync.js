@@ -130,7 +130,10 @@ async function syncFromESPN(db) {
       }
 
       const detail = (statusType.detail || statusType.shortDetail || '').toLowerCase();
-      const isAET = /extra|aet|penalties|pen\b|pks/i.test(detail);
+      // A tied score in a knockout match MUST mean AET/penalties regardless of status text
+      const scoreEqual = homeScore === awayScore;
+      const isAET = /extra|aet|penalties|pen\b|pks|final\/p/i.test(detail)
+        || (match.is_knockout && scoreEqual);
       const aetResult = match.is_knockout ? (isAET ? 'aet' : '90min') : null;
 
       const saVal = !flipped ? homeScore : awayScore;
