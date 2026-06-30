@@ -130,9 +130,11 @@ async function syncFromESPN(db) {
       }
 
       const detail = (statusType.detail || statusType.shortDetail || '').toLowerCase();
-      // A tied score in a knockout match MUST mean AET/penalties regardless of status text
+      const period  = comp.status?.period || 2;
+      // AET detection: text hint, OR period > 2 (extra time), OR tied score in KO (penalties)
       const scoreEqual = homeScore === awayScore;
       const isAET = /extra|aet|penalties|pen\b|pks|final\/p/i.test(detail)
+        || (match.is_knockout && period > 2)
         || (match.is_knockout && scoreEqual);
       const aetResult = match.is_knockout ? (isAET ? 'aet' : '90min') : null;
 
