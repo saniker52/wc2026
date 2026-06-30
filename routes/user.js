@@ -573,7 +573,10 @@ router.get('/users/:id/predictions', requireLogin, (req, res) => {
   res.render('user-predictions', {
     title: `${targetUser.display_name || targetUser.username}'s Predictions`,
     targetUser,
-    preds: preds.map(p => ({ ...p, match_time_kwt: toKuwaitTime(p.match_time) })),
+    preds: preds.map(p => {
+      const pts = p.result ? calculateMatchPoints(p, { result: p.result, aet_result: p.aet_result }, p) : null;
+      return { ...p, match_time_kwt: toKuwaitTime(p.match_time), pts };
+    }),
     isAdmin,
     viewerName: req.session.user.display_name || req.session.user.username
   });

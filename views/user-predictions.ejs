@@ -63,7 +63,10 @@
               <% if (!p.result) { %>
                 <span style="font-size:.75rem;color:var(--muted)">Pending</span>
               <% } else if (correct) { %>
-                <span class="prediction-pill correct" style="font-size:.72rem">✅ Correct</span>
+                <div><span class="prediction-pill correct" style="font-size:.72rem">✅ Correct</span></div>
+                <div style="margin-top:4px;font-size:.78rem;font-weight:700;color:var(--gold)">
+                  +<%= p.pts.main %><% if (p.pts.bonus > 0) { %><span style="color:var(--text-dim);font-weight:400"> +<%= p.pts.bonus %> bonus</span><% } %> pt<%= (p.pts.main + p.pts.bonus) !== 1 ? 's' : '' %>
+                </div>
               <% } else { %>
                 <span class="prediction-pill incorrect" style="font-size:.72rem">❌ Wrong</span>
               <% } %>
