@@ -112,11 +112,21 @@ async function syncFromESPN(db) {
       const homeScore = parseInt(home.score ?? 0);
       const awayScore = parseInt(away.score ?? 0);
 
+      // Prefer ESPN's explicit winner flag — handles PKs where score is tied
       let result;
-      if (!flipped) {
-        result = homeScore > awayScore ? 'team_a' : homeScore < awayScore ? 'team_b' : 'draw';
+      if (home.winner === true && away.winner !== true) {
+        result = !flipped ? 'team_a' : 'team_b';
+      } else if (away.winner === true && home.winner !== true) {
+        result = !flipped ? 'team_b' : 'team_a';
       } else {
-        result = awayScore > homeScore ? 'team_a' : awayScore < homeScore ? 'team_b' : 'draw';
+        // Fallback: score comparison (group stage and clear wins)
+        if (!flipped) {
+          result = homeScore > awayScore ? 'team_a' : homeScore < awayScore ? 'team_b' : 'draw';
+        } else {
+          result = awayScore > homeScore ? 'team_a' : awayScore < homeScore ? 'team_b' : 'draw';
+        }
+        // Knockout matches must never be a draw — if scores tied and no winner flag, log and skip
+        if (result === 'draw' && match.is_knockout) { skipped++; continue; }
       }
 
       const detail = (statusType.detail || statusType.shortDetail || '').toLowerCase();
