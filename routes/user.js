@@ -16,6 +16,14 @@ router.get('/dashboard', requireLogin, (req, res) => {
   }
   const todayKwt = kwtDate(now);
 
+  // Match currently in progress (started, no result yet)
+  const liveMatch = db.prepare(`
+    SELECT m.* FROM matches m
+    LEFT JOIN results r ON r.match_id = m.id
+    WHERE r.id IS NULL AND m.match_time <= ?
+    ORDER BY m.match_time DESC LIMIT 1
+  `).get(now);
+
   // Absolute next upcoming match
   const nextMatch = db.prepare(`
     SELECT m.* FROM matches m
@@ -112,9 +120,10 @@ router.get('/dashboard', requireLogin, (req, res) => {
         LIMIT 60
       `).all(now, now);
 
-  // Current display match: use ?matchId param if valid, else default to nextMatch
+  // Current display match: use ?matchId param if valid, else live match > next upcoming > first in nav
   const reqMatchId = req.query.matchId ? parseInt(req.query.matchId) : null;
   const displayMatch = (reqMatchId && navList.find(m => m.id === reqMatchId))
+    || liveMatch
     || nextMatch
     || navList[0] || null;
 
