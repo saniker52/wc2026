@@ -453,7 +453,14 @@ function computeLeaderboard(dbInstance) {
   });
 
   rows.sort((a, b) => b.total - a.total || b.correct - a.correct);
-  rows.forEach((r, i) => { r.rank = i + 1; });
+  // Competition ranking (1224): tied players share the same rank
+  for (let i = 0; i < rows.length; i++) {
+    if (i > 0 && rows[i].total === rows[i-1].total && rows[i].correct === rows[i-1].correct) {
+      rows[i].rank = rows[i-1].rank; // same tie group
+    } else {
+      rows[i].rank = i + 1; // actual 1-based position
+    }
+  }
 
   return rows;
 }
