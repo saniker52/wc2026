@@ -74,11 +74,65 @@
 
       <hr class="divider">
 
-      <div class="rules-section" style="margin-bottom:0">
+      <div class="rules-section">
         <h3>🕐 Times</h3>
         <p style="font-size:.9rem;color:var(--text-dim);line-height:1.8">
           All match times on this platform are displayed in <strong style="color:var(--text)">Kuwait Time (UTC+3)</strong>.
           Make sure to submit predictions before kickoff time shown on each match card.
+        </p>
+      </div>
+
+      <hr class="divider">
+
+      <div class="rules-section" id="prizes" style="margin-bottom:0">
+        <h3>💰 Prize Distribution</h3>
+        <p style="font-size:.9rem;color:var(--text-dim);line-height:1.8;margin-bottom:16px">
+          Prizes are awarded after the Final match using the <strong style="color:var(--text)">Competition Ranking (1224)</strong> system.
+          Tied players share the combined prize money of all positions they occupy, divided equally.
+        </p>
+
+        <table class="rules-table" style="margin-bottom:20px">
+          <thead><tr><th>Position</th><th>Prize</th><th>Award</th></tr></thead>
+          <tbody>
+            <tr><td>🥇 1st Place</td><td><strong style="color:var(--gold)">200 KD</strong></td><td>Champion Trophy</td></tr>
+            <tr><td>🥈 2nd Place</td><td><strong style="color:var(--gold)">80 KD</strong></td><td>Silver Medal</td></tr>
+            <tr><td>🥉 3rd Place</td><td><strong style="color:var(--gold)">50 KD</strong></td><td>Bronze Medal</td></tr>
+            <tr><td colspan="2" style="color:var(--text-dim)">Total Prize Pool</td><td><strong style="color:var(--gold)">330 KD</strong></td></tr>
+          </tbody>
+        </table>
+
+        <p style="font-size:.82rem;font-weight:600;color:var(--text);margin-bottom:10px">How tie-splitting works</p>
+
+        <div style="display:grid;gap:10px;font-size:.82rem">
+
+          <div style="background:rgba(255,255,255,.04);border:1px solid var(--border);border-radius:10px;padding:12px 14px">
+            <div style="font-weight:700;color:var(--text);margin-bottom:6px">Example 1 — Two players tie for 1st</div>
+            <div style="color:var(--text-dim);line-height:1.7">
+              1st + 2nd positions occupied → prizes combined: 200 + 80 = <strong style="color:var(--gold)">280 KD</strong><br>
+              Each receives <strong style="color:var(--gold)">140 KD</strong> · Next player finishes 3rd (50 KD)
+            </div>
+          </div>
+
+          <div style="background:rgba(255,255,255,.04);border:1px solid var(--border);border-radius:10px;padding:12px 14px">
+            <div style="font-weight:700;color:var(--text);margin-bottom:6px">Example 2 — Two players tie for 2nd</div>
+            <div style="color:var(--text-dim);line-height:1.7">
+              2nd + 3rd positions occupied → prizes combined: 80 + 50 = <strong style="color:var(--gold)">130 KD</strong><br>
+              Each receives <strong style="color:var(--gold)">65 KD</strong> · 1st place unaffected (200 KD)
+            </div>
+          </div>
+
+          <div style="background:rgba(255,255,255,.04);border:1px solid var(--border);border-radius:10px;padding:12px 14px">
+            <div style="font-weight:700;color:var(--text);margin-bottom:6px">Example 3 — Three or more players tie for 1st</div>
+            <div style="color:var(--text-dim);line-height:1.7">
+              All prize positions occupied → entire pool: 200 + 80 + 50 = <strong style="color:var(--gold)">330 KD</strong> split equally<br>
+              Only Champion Trophies awarded — no separate 2nd or 3rd prizes
+            </div>
+          </div>
+
+        </div>
+
+        <p style="font-size:.8rem;color:var(--muted);margin-top:14px;line-height:1.6">
+          When prizes don't divide evenly, amounts are rounded to the nearest 1 KD while ensuring the full 330 KD is always distributed.
         </p>
       </div>
 
