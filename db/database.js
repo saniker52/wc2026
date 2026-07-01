@@ -453,10 +453,11 @@ function computeLeaderboard(dbInstance) {
   });
 
   rows.sort((a, b) => b.total - a.total || b.correct - a.correct);
-  // Competition ranking (1224): tied players share the same rank
+  // Competition ranking (1224): tied players share the same rank.
+  // Tie is determined by total points only — correct count is display order only.
   for (let i = 0; i < rows.length; i++) {
-    if (i > 0 && rows[i].total === rows[i-1].total && rows[i].correct === rows[i-1].correct) {
-      rows[i].rank = rows[i-1].rank; // same tie group
+    if (i > 0 && rows[i].total === rows[i-1].total) {
+      rows[i].rank = rows[i-1].rank; // same total → same rank
     } else {
       rows[i].rank = i + 1; // actual 1-based position
     }
