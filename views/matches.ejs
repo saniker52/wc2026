@@ -215,8 +215,8 @@
               <%/* ── Result is in ── */%>
               <% if (m.prediction) { %>
                 <% if (m.pts.main > 0) { %>
-                  <span class="prediction-pill correct">✅ +<%= m.pts.main + m.pts.bonus %> pts</span>
-                  <% if (m.pts.bonus > 0) { %><span class="prediction-pill saved" style="font-size:.7rem">⭐ AET +1</span><% } %>
+                  <span class="prediction-pill correct">✅ +<%= m.pts.main %> pts</span>
+                  <% if (m.pts.bonus > 0) { %><span class="prediction-pill saved" style="font-size:.7rem">⭐ Bonus +1</span><% } %>
                 <% } else { %>
                   <span class="prediction-pill incorrect">❌ Wrong</span>
                 <% } %>
