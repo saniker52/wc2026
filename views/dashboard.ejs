@@ -185,7 +185,6 @@
             <div class="section-title">⏳ Predict Now</div>
             <div class="section-subtitle">Open matches</div>
           </div>
-          <button id="save-preds-btn" onclick="savePredictions()" class="btn btn-primary btn-sm" style="display:none">💾 Save</button>
         </div>
 
         <% if (upcoming.length === 0) { %>
@@ -228,17 +227,11 @@
                     onclick="selectPred(<%= m.id %>,'team_b',this)"
                     class="dash-pred-btn<%= m.prediction==='team_b' ? ' dpb-sel' : '' %>" style="flex:1"><%= m.team_b.split(' ')[0] %></button>
                 </div>
-                <div style="display:flex;gap:16px;justify-content:center;font-size:.75rem;color:var(--text-dim)">
-                  <label style="display:flex;align-items:center;gap:4px;cursor:pointer">
-                    <input type="radio" name="aet_<%= m.id %>" value="90min"
-                      onchange="selectAET(<%= m.id %>,'90min')"
-                      <%= m.aet_prediction==='90min' ? 'checked' : '' %>> ⏱️ 90 min
-                  </label>
-                  <label style="display:flex;align-items:center;gap:4px;cursor:pointer">
-                    <input type="radio" name="aet_<%= m.id %>" value="aet"
-                      onchange="selectAET(<%= m.id %>,'aet')"
-                      <%= m.aet_prediction==='aet' ? 'checked' : '' %>> 🥅 AET
-                  </label>
+                <div style="display:flex;gap:6px;justify-content:center">
+                  <button type="button" onclick="selectAET(<%= m.id %>,'90min',this)"
+                    class="aet-dash-btn<%= m.aet_prediction==='90min' ? ' aet-dash-sel' : '' %>">⏱️ 90 min</button>
+                  <button type="button" onclick="selectAET(<%= m.id %>,'aet',this)"
+                    class="aet-dash-btn<%= m.aet_prediction==='aet' ? ' aet-dash-sel' : '' %>">🥅 AET</button>
                 </div>
                 <div id="status-<%= m.id %>" style="text-align:center;font-size:.68rem;margin-top:4px;color:<%= m.prediction ? 'var(--muted)' : '#fbbf24' %>">
                   <%= m.prediction ? '✓ Saved' : '⚠ No pick yet' %>
@@ -482,74 +475,71 @@
 .dash-pred-btn:hover { border-color: rgba(255,255,255,.45); color: var(--text); }
 .dash-pred-btn.dpb-sel { border-color: rgba(255,255,255,.75); background: rgba(255,255,255,.12); color: #fff; font-weight: 700; }
 .match-card.needs-pick { border-left: 3px solid rgba(251,191,36,.5); }
+.aet-dash-btn {
+  padding: 4px 12px;
+  border-radius: 6px;
+  border: 1px solid var(--border);
+  background: transparent;
+  color: var(--text-dim);
+  font-size: .7rem;
+  cursor: pointer;
+  transition: border-color .15s, background .15s, color .15s;
+}
+.aet-dash-btn.aet-dash-sel { border-color: var(--gold); background: rgba(251,191,36,.12); color: var(--gold); }
 </style>
 
 <script>
-// ── Batch predictions ─────────────────────────────────────────────────────────
-var pendingPreds = {};
+// ── Auto-save predictions ─────────────────────────────────────────────────────
+const dashSelections = {};
+<% upcoming.forEach(m => { %>
+dashSelections[<%= m.id %>] = {
+  prediction: <%- m.prediction ? `'${m.prediction}'` : 'null' %>,
+  aet_prediction: <%- m.aet_prediction ? `'${m.aet_prediction}'` : 'null' %>,
+  is_knockout: <%= !!m.is_knockout %>
+};
+<% }); %>
 
 function selectPred(matchId, val, btn) {
-  if (!pendingPreds[matchId]) pendingPreds[matchId] = {};
-  pendingPreds[matchId].prediction = val;
-  // update button highlight
-  document.querySelectorAll('[data-match="' + matchId + '"]').forEach(function(b) {
-    b.classList.remove('dpb-sel');
-  });
+  dashSelections[matchId].prediction = val;
+  document.querySelectorAll('[data-match="' + matchId + '"]').forEach(b => b.classList.remove('dpb-sel'));
   btn.classList.add('dpb-sel');
-  // update status label
-  var s = document.getElementById('status-' + matchId);
-  if (s) { s.textContent = '· unsaved'; s.style.color = '#fbbf24'; }
-  updateSaveBtn();
+  autoSaveDash(matchId);
 }
 
-function selectAET(matchId, val) {
-  if (!pendingPreds[matchId]) pendingPreds[matchId] = {};
-  pendingPreds[matchId].aet_prediction = val;
-  var s = document.getElementById('status-' + matchId);
-  if (s) s.textContent = '· unsaved';
-  updateSaveBtn();
+function selectAET(matchId, val, btn) {
+  dashSelections[matchId].aet_prediction = val;
+  btn.closest('div').querySelectorAll('.aet-dash-btn').forEach(b => b.classList.remove('aet-dash-sel'));
+  btn.classList.add('aet-dash-sel');
+  autoSaveDash(matchId);
 }
 
-function updateSaveBtn() {
-  var btn = document.getElementById('save-preds-btn');
-  if (!btn) return;
-  var count = Object.keys(pendingPreds).length;
-  if (count > 0) {
-    btn.style.display = '';
-    btn.textContent = '💾 Save (' + count + ')';
-  } else {
-    btn.style.display = 'none';
-  }
-}
+async function autoSaveDash(matchId) {
+  const sel = dashSelections[matchId] || {};
+  if (!sel.prediction) return;
+  if (sel.is_knockout && !['90min', 'aet'].includes(sel.aet_prediction)) return;
 
-async function savePredictions() {
-  var btn = document.getElementById('save-preds-btn');
-  var predictions = Object.entries(pendingPreds)
-    .filter(function(e) { return e[1].prediction; })
-    .map(function(e) {
-      return { matchId: parseInt(e[0]), prediction: e[1].prediction, aet_prediction: e[1].aet_prediction || null };
-    });
-  if (!predictions.length) return;
-  btn.disabled = true;
-  btn.textContent = 'Saving…';
+  const statusEl = document.getElementById('status-' + matchId);
+  if (statusEl) { statusEl.textContent = 'Saving…'; statusEl.style.color = 'var(--text-dim)'; }
+
   try {
-    var res = await fetch('/matches/predict-batch', {
+    const resp = await fetch('/matches/predict-batch', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ predictions: predictions })
+      body: JSON.stringify({
+        predictions: [{ matchId, prediction: sel.prediction, aet_prediction: sel.is_knockout ? sel.aet_prediction : null }]
+      })
     });
-    var data = await res.json();
-    if (data.ok) {
-      location.reload();
+    const data = await resp.json();
+    if (data.saved && data.saved.length > 0) {
+      if (statusEl) { statusEl.textContent = '✓ Saved'; statusEl.style.color = '#22c55e'; }
+      const card = document.getElementById('card-' + matchId);
+      if (card) card.classList.remove('needs-pick');
     } else {
-      alert('Some picks couldn\'t be saved:\n' + (data.errors || []).join('\n'));
-      btn.disabled = false;
-      updateSaveBtn();
+      const msg = data.errors && data.errors.length ? data.errors.join('\n') : 'Save failed.';
+      if (statusEl) { statusEl.textContent = '⚠ ' + msg; statusEl.style.color = '#ef4444'; }
     }
   } catch(e) {
-    alert('Network error — please try again.');
-    btn.disabled = false;
-    updateSaveBtn();
+    if (statusEl) { statusEl.textContent = '⚠ Save failed — try again.'; statusEl.style.color = '#ef4444'; }
   }
 }
 </script>
