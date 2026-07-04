@@ -318,9 +318,12 @@
           </div>
           <% } %>
 
-          <div style="font-size:.75rem;color:var(--text-dim);margin-top:6px;text-align:center">
-            Hit <strong style="color:var(--accent)">Save All</strong> at the top when ready
-          </div>
+          <button id="save-btn-<%= m.id %>"
+                  onclick="saveSingle(<%= m.id %>, <%= m.is_knockout ? 'true' : 'false' %>)"
+                  class="btn btn-primary"
+                  style="width:100%;margin-top:6px;padding:9px">
+            💾 Save
+          </button>
 
         </div>
         <% } %>
@@ -342,27 +345,40 @@ const savedPredictions = {
 
 const pending = {};
 
-function setPending(matchId, isKnockout) {
+// saveSingle: reads the form state at click time — no stale pending, no change tracking.
+async function saveSingle(matchId, isKnockout) {
   const predEl = document.querySelector(`input[name="pred_${matchId}"]:checked`);
-  if (!predEl) return;
+  if (!predEl) { alert('Please select a team first.'); return; }
   const pred = predEl.value;
   let aet = null;
   if (isKnockout) {
     const aetEl = document.querySelector(`input[name="aet_${matchId}"]:checked`);
-    if (aetEl) {
-      aet = aetEl.value;
-    } else {
-      // No AET radio selected — use saved value or default to 90min
-      const sv = savedPredictions[matchId];
-      aet = (sv && sv.aet_prediction) || '90min';
-      const defaultEl = document.querySelector(`input[name="aet_${matchId}"][value="${aet}"]`);
-      if (defaultEl) defaultEl.checked = true;
-    }
+    if (!aetEl) { alert('Please select whether it ends in 90 min or AET.'); return; }
+    aet = aetEl.value;
   }
-  // Always write current state — never remove from pending based on "unchanged" comparison,
-  // as that logic caused saves to silently drop when only one field changed.
-  pending[matchId] = { prediction: pred, aet_prediction: aet };
-  updateSaveBar();
+  const btn = document.getElementById('save-btn-' + matchId);
+  if (btn) { btn.disabled = true; btn.textContent = 'Saving…'; }
+  try {
+    const resp = await fetch('/matches/predict-batch', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ predictions: [{ matchId, prediction: pred, aet_prediction: aet }] })
+    });
+    const data = await resp.json();
+    if (data.saved && data.saved.length > 0) {
+      window.location.reload();
+    } else {
+      const msg = data.errors && data.errors.length ? data.errors.join('\n') : 'Save failed — try again.';
+      alert('⚠️ ' + msg);
+      if (btn) { btn.disabled = false; btn.textContent = '💾 Save'; }
+    }
+  } catch(e) {
+    alert('Save failed — try again.');
+    if (btn) { btn.disabled = false; btn.textContent = '💾 Save'; }
+  }
+}
+
+function setPending(matchId, isKnockout) {
+  // No-op: pending/Save All retained for compatibility but saveSingle is the primary path.
 }
 
 function updateSaveBar() {
