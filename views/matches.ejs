@@ -277,53 +277,49 @@
         <% if (!m.result && !m.is_locked && !user.is_admin) { %>
         <div id="predict-form-<%= m.id %>" class="predict-form" style="display:none">
 
-          <div class="predict-opts">
-            <div class="predict-opt">
-              <input type="radio" id="pa_<%= m.id %>" name="pred_<%= m.id %>" value="team_a"
-                     <%= m.prediction === 'team_a' ? 'checked' : '' %>
-                     onchange="setPending(<%= m.id %>, <%= m.is_knockout ? 'true' : 'false' %>)">
-              <label for="pa_<%= m.id %>" title="<%= m.team_a %>"><%= m.team_a %></label>
+          <form method="POST" action="/matches/<%= m.id %>/predict" style="margin:0">
+            <input type="hidden" name="_returnTo" value="/matches">
+
+            <div class="predict-opts">
+              <div class="predict-opt">
+                <input type="radio" id="pa_<%= m.id %>" name="prediction" value="team_a"
+                       <%= m.prediction === 'team_a' ? 'checked' : '' %>>
+                <label for="pa_<%= m.id %>" title="<%= m.team_a %>"><%= m.team_a %></label>
+              </div>
+              <% if (!m.is_knockout) { %>
+              <div class="predict-opt">
+                <input type="radio" id="pd_<%= m.id %>" name="prediction" value="draw"
+                       <%= m.prediction === 'draw' ? 'checked' : '' %>>
+                <label for="pd_<%= m.id %>">🤝 Draw</label>
+              </div>
+              <% } %>
+              <div class="predict-opt">
+                <input type="radio" id="pb_<%= m.id %>" name="prediction" value="team_b"
+                       <%= m.prediction === 'team_b' ? 'checked' : '' %>>
+                <label for="pb_<%= m.id %>" title="<%= m.team_b %>"><%= m.team_b %></label>
+              </div>
             </div>
-            <% if (!m.is_knockout) { %>
-            <div class="predict-opt">
-              <input type="radio" id="pd_<%= m.id %>" name="pred_<%= m.id %>" value="draw"
-                     <%= m.prediction === 'draw' ? 'checked' : '' %>
-                     onchange="setPending(<%= m.id %>, false)">
-              <label for="pd_<%= m.id %>">🤝 Draw</label>
+
+            <% if (m.is_knockout) { %>
+            <div class="predict-aet">
+              <span>Decided in:</span>
+              <div>
+                <input type="radio" id="a90_<%= m.id %>" name="aet_prediction" value="90min"
+                       <%= m.aet_prediction === '90min' ? 'checked' : '' %>>
+                <label for="a90_<%= m.id %>">90 min</label>
+              </div>
+              <div>
+                <input type="radio" id="aet_<%= m.id %>" name="aet_prediction" value="aet"
+                       <%= m.aet_prediction === 'aet' ? 'checked' : '' %>>
+                <label for="aet_<%= m.id %>">AET / Pens</label>
+              </div>
             </div>
             <% } %>
-            <div class="predict-opt">
-              <input type="radio" id="pb_<%= m.id %>" name="pred_<%= m.id %>" value="team_b"
-                     <%= m.prediction === 'team_b' ? 'checked' : '' %>
-                     onchange="setPending(<%= m.id %>, <%= m.is_knockout ? 'true' : 'false' %>)">
-              <label for="pb_<%= m.id %>" title="<%= m.team_b %>"><%= m.team_b %></label>
-            </div>
-          </div>
 
-          <% if (m.is_knockout) { %>
-          <div class="predict-aet">
-            <span>Decided in:</span>
-            <div>
-              <input type="radio" id="a90_<%= m.id %>" name="aet_<%= m.id %>" value="90min"
-                     <%= m.aet_prediction === '90min' ? 'checked' : '' %>
-                     onchange="setPending(<%= m.id %>, true)">
-              <label for="a90_<%= m.id %>">90 min</label>
-            </div>
-            <div>
-              <input type="radio" id="aet_<%= m.id %>" name="aet_<%= m.id %>" value="aet"
-                     <%= m.aet_prediction === 'aet' ? 'checked' : '' %>
-                     onchange="setPending(<%= m.id %>, true)">
-              <label for="aet_<%= m.id %>">AET / Pens</label>
-            </div>
-          </div>
-          <% } %>
-
-          <button id="save-btn-<%= m.id %>"
-                  onclick="saveSingle(<%= m.id %>, <%= m.is_knockout ? 'true' : 'false' %>)"
-                  class="btn btn-primary"
-                  style="width:100%;margin-top:6px;padding:9px">
-            💾 Save
-          </button>
+            <button type="submit" class="btn btn-primary" style="width:100%;margin-top:6px;padding:9px">
+              💾 Save
+            </button>
+          </form>
 
         </div>
         <% } %>
