@@ -349,7 +349,16 @@ function setPending(matchId, isKnockout) {
   let aet = null;
   if (isKnockout) {
     const aetEl = document.querySelector(`input[name="aet_${matchId}"]:checked`);
-    aet = aetEl ? aetEl.value : null;
+    if (aetEl) {
+      aet = aetEl.value;
+    } else {
+      // Nothing selected yet — fall back to previously saved value, or default to '90min'
+      const saved = savedPredictions[matchId];
+      aet = (saved && saved.aet_prediction) || '90min';
+      // Also check the default radio so the UI reflects this
+      const defaultEl = document.querySelector(`input[name="aet_${matchId}"][value="${aet}"]`);
+      if (defaultEl) defaultEl.checked = true;
+    }
   }
   const saved = savedPredictions[matchId];
   const unchanged = saved && saved.prediction === pred && saved.aet_prediction === aet;
@@ -377,9 +386,15 @@ async function saveAll() {
       body: JSON.stringify({ predictions })
     });
     const data = await resp.json();
-    if (data.ok) { window.location.reload(); }
-    else {
-      alert('⚠️ ' + (data.errors || []).join('\n'));
+    // Reload if anything was saved; show errors if any predictions were rejected
+    if (data.errors && data.errors.length > 0) {
+      alert('⚠️ Some predictions could not be saved:\n' + data.errors.join('\n'));
+    }
+    if (data.saved && data.saved.length > 0) {
+      window.location.reload();
+    } else if (!data.errors || data.errors.length === 0) {
+      window.location.reload(); // fallback
+    } else {
       btn.disabled = false; updateSaveBar();
     }
   } catch (e) {
