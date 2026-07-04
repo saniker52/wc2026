@@ -96,44 +96,48 @@ router.get('/dashboard', requireLogin, (req, res) => {
   const myRank = lb.find(r => r.id === userId)?.rank || '-';
   const totalUsers = lb.length;
 
-  // Navigable list — for knockout rounds, always show ALL matches of that round so
-  // users can toggle through every match regardless of when it was played.
-  // For group stage, keep the matchday window. Admins see everything.
   const isAdmin = req.session.user.is_admin;
-  const activeRound = refMatch ? refMatch.round : null;
+
+  // Determine the active round to navigate.
+  // Use nextMatch.round if all matches of lastStarted's round are done,
+  // so we don't get stuck showing a completed round while the next is starting.
+  let activeRound = refMatch ? refMatch.round : null;
+  if (activeRound && activeRound !== 'group' && nextMatch && nextMatch.round !== activeRound) {
+    // Transition: last completed round differs from next upcoming — show next round
+    activeRound = nextMatch.round;
+  }
   const isKnockoutRound = activeRound && activeRound !== 'group';
 
-  const navList = isAdmin || isKnockoutRound
-    ? db.prepare(`
-        SELECT m.id, m.team_a, m.team_b, m.match_time, m.round, m.group_name, m.is_locked,
-               r.result IS NOT NULL as has_result, r.result as match_result
-        FROM matches m
-        LEFT JOIN results r ON r.match_id = m.id
-        ${isKnockoutRound && !isAdmin ? `WHERE m.round = '${activeRound}'` : ''}
-        ORDER BY m.match_time ASC
-      `).all()
-    : db.prepare(`
-        SELECT m.id, m.team_a, m.team_b, m.match_time, m.round, m.group_name, m.is_locked,
-               r.result IS NOT NULL as has_result, r.result as match_result
-        FROM matches m
-        LEFT JOIN results r ON r.match_id = m.id
-        WHERE (
-          (date(datetime(m.match_time, '+3 hours')) >= date(datetime('now', '+3 hours', '-2 days'))
-           AND m.match_time <= ?)
-          OR (r.id IS NULL AND m.match_time > ? ${navFilter})
-        )
-        ORDER BY m.match_time ASC
-        LIMIT 60
-      `).all(now, now);
+  const NAV_COLS = `SELECT m.id, m.team_a, m.team_b, m.match_time, m.round, m.group_name, m.is_locked,
+                           r.result IS NOT NULL as has_result, r.result as match_result
+                    FROM matches m LEFT JOIN results r ON r.match_id = m.id`;
 
-  // Current display match: use ?matchId param if valid, else live match > next upcoming > first in nav
+  let navList;
+  if (isAdmin) {
+    navList = db.prepare(`${NAV_COLS} ORDER BY m.match_time ASC`).all();
+  } else if (isKnockoutRound && activeRound) {
+    // All matches of this knockout round — past, present, future
+    navList = db.prepare(`${NAV_COLS} WHERE m.round = ? ORDER BY m.match_time ASC`).all(activeRound);
+  } else {
+    // Group stage: active matchday window
+    navList = db.prepare(`${NAV_COLS}
+      WHERE (
+        (date(datetime(m.match_time, '+3 hours')) >= date(datetime('now', '+3 hours', '-2 days')) AND m.match_time <= ?)
+        OR (r.id IS NULL AND m.match_time > ? ${navFilter})
+      )
+      ORDER BY m.match_time ASC LIMIT 60`).all(now, now);
+  }
+
+  // displayMatch must always be inside navList so displayIdx is valid and arrows appear.
   const reqMatchId = req.query.matchId ? parseInt(req.query.matchId) : null;
-  const displayMatch = (reqMatchId && navList.find(m => m.id === reqMatchId))
-    || liveMatch
-    || nextMatch
-    || navList[0] || null;
+  let displayMatch =
+       (reqMatchId  && navList.find(m => m.id === reqMatchId))
+    || (liveMatch   && navList.find(m => m.id === liveMatch.id))
+    || (nextMatch   && navList.find(m => m.id === nextMatch.id))
+    || navList[0]
+    || null;
 
-  const displayIdx = navList.findIndex(m => m.id === displayMatch?.id);
+  const displayIdx = displayMatch ? navList.findIndex(m => m.id === displayMatch.id) : -1;
   const prevNavMatch = displayIdx > 0 ? navList[displayIdx - 1] : null;
   const nextNavMatch = displayIdx >= 0 && displayIdx < navList.length - 1 ? navList[displayIdx + 1] : null;
 
