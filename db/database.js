@@ -421,7 +421,7 @@ function computeLeaderboard(dbInstance) {
   });
 
   const rows = users.map(u => {
-    let groupPts = 0, knockoutPts = 0, bonusPts = 0, correct = 0;
+    let groupPts = 0, r32Pts = 0, r16Pts = 0, qfPts = 0, sfPts = 0, finalPts = 0, bonusPts = 0, correct = 0;
     const userPreds = predMap[u.id] || {};
 
     matches.forEach(m => {
@@ -435,16 +435,27 @@ function computeLeaderboard(dbInstance) {
       if (m.round === 'group') {
         groupPts += main;
       } else {
-        knockoutPts += main;
-        bonusPts   += bonus;
+        bonusPts += bonus;
+        if (m.round === 'r32')                    r32Pts   += main;
+        else if (m.round === 'r16')               r16Pts   += main;
+        else if (m.round === 'qf')                qfPts    += main;
+        else if (m.round === 'sf')                sfPts    += main;
+        else if (m.round === '3rd' || m.round === 'final') finalPts += main;
       }
     });
+
+    const knockoutPts = r32Pts + r16Pts + qfPts + sfPts + finalPts;
 
     return {
       id: u.id,
       username: u.username,
       display_name: u.display_name || u.username,
       group_pts: groupPts,
+      r32_pts: r32Pts,
+      r16_pts: r16Pts,
+      qf_pts: qfPts,
+      sf_pts: sfPts,
+      final_pts: finalPts,
       knockout_pts: knockoutPts,
       bonus_pts: bonusPts,
       total: groupPts + knockoutPts + bonusPts,
