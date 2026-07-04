@@ -96,14 +96,20 @@ router.get('/dashboard', requireLogin, (req, res) => {
   const myRank = lb.find(r => r.id === userId)?.rank || '-';
   const totalUsers = lb.length;
 
-  // Navigable list — admin sees every match across all rounds; users see active window only
+  // Navigable list — for knockout rounds, always show ALL matches of that round so
+  // users can toggle through every match regardless of when it was played.
+  // For group stage, keep the matchday window. Admins see everything.
   const isAdmin = req.session.user.is_admin;
-  const navList = isAdmin
+  const activeRound = refMatch ? refMatch.round : null;
+  const isKnockoutRound = activeRound && activeRound !== 'group';
+
+  const navList = isAdmin || isKnockoutRound
     ? db.prepare(`
         SELECT m.id, m.team_a, m.team_b, m.match_time, m.round, m.group_name, m.is_locked,
                r.result IS NOT NULL as has_result, r.result as match_result
         FROM matches m
         LEFT JOIN results r ON r.match_id = m.id
+        ${isKnockoutRound && !isAdmin ? `WHERE m.round = '${activeRound}'` : ''}
         ORDER BY m.match_time ASC
       `).all()
     : db.prepare(`
@@ -253,6 +259,8 @@ router.get('/dashboard', requireLogin, (req, res) => {
     displayMatch: displayMatch ? { ...displayMatch, match_time_kwt: toKuwaitTimeShort(displayMatch.match_time) } : null,
     prevNavMatch,
     nextNavMatch,
+    navTotal: navList.length,
+    navIndex: displayIdx >= 0 ? displayIdx + 1 : null,
     nextPredMap,
     nextMatchRoundVisible: displayRoundVisible,
     missingPreds,

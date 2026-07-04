@@ -37,6 +37,10 @@
 
     <div class="card" style="overflow:hidden;margin-bottom:28px;padding:0">
       <% if (displayMatch) { %>
+      <%
+        const roundLabels = { r32: 'Round of 32', r16: 'Round of 16', qf: 'Quarterfinals', sf: 'Semifinals', '3rd': '3rd Place', final: 'Final', group: 'Group Stage' };
+        const roundLabel = roundLabels[displayMatch.round] || displayMatch.round.toUpperCase();
+      %>
       <div style="padding:8px 12px;background:rgba(255,255,255,.03);border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;gap:8px">
         <% if (prevNavMatch) { %>
           <a href="/dashboard?matchId=<%= prevNavMatch.id %>" class="btn btn-secondary btn-sm" style="padding:3px 10px;font-size:.78rem;flex-shrink:0">←</a>
@@ -44,6 +48,9 @@
           <span style="width:36px;flex-shrink:0"></span>
         <% } %>
         <div style="text-align:center;font-size:.78rem;color:var(--text-dim);flex:1;display:flex;flex-direction:column;align-items:center;gap:2px">
+          <div style="font-size:.65rem;color:var(--muted);text-transform:uppercase;letter-spacing:.05em">
+            <%= roundLabel %><% if (navTotal > 1) { %> · <%= navIndex %>/<%= navTotal %><% } %>
+          </div>
           <div>
             <strong style="color:var(--text)"><%= displayMatch.team_a %> vs <%= displayMatch.team_b %></strong>
           </div>
