@@ -14,8 +14,7 @@
   margin-bottom: 8px;
   flex-wrap: wrap;
 }
-.predict-opt input[type="radio"] { position: absolute; opacity: 0; width: 0; height: 0; pointer-events: none; }
-.predict-opt label {
+.pred-btn {
   flex: 1;
   min-width: 0;
   text-align: center;
@@ -31,13 +30,15 @@
   overflow: hidden;
   text-overflow: ellipsis;
   display: block;
+  background: transparent;
+  width: 100%;
 }
-.predict-opt input[type="radio"]:checked + label {
+.pred-btn.pred-selected {
   border-color: var(--accent);
   background: rgba(59,130,246,.15);
   color: var(--text);
 }
-.predict-opt label:hover { border-color: var(--accent); color: var(--text); }
+.pred-btn:hover { border-color: var(--accent); color: var(--text); }
 .predict-aet {
   display: flex;
   align-items: center;
@@ -46,8 +47,7 @@
   font-size: .8rem;
   color: var(--text-dim);
 }
-.predict-aet input[type="radio"] { position: absolute; opacity: 0; width: 0; height: 0; pointer-events: none; }
-.predict-aet label {
+.aet-btn {
   padding: 5px 14px;
   border: 1.5px solid var(--border);
   border-radius: 6px;
@@ -55,13 +55,14 @@
   font-size: .8rem;
   color: var(--text-dim);
   transition: all .15s;
+  background: transparent;
 }
-.predict-aet input[type="radio"]:checked + label {
+.aet-btn.aet-selected {
   border-color: var(--gold);
   background: rgba(251,191,36,.12);
   color: var(--gold);
 }
-.predict-aet label:hover { border-color: var(--gold); }
+.aet-btn:hover { border-color: var(--gold); }
 .saved-pred-row {
   display: flex;
   align-items: center;
@@ -279,40 +280,37 @@
 
           <form method="POST" action="/matches/<%= m.id %>/predict" style="margin:0">
             <input type="hidden" name="_returnTo" value="/matches">
+            <input type="hidden" name="prediction" id="pred-val-<%= m.id %>" value="<%= m.prediction || '' %>">
+            <% if (m.is_knockout) { %>
+            <input type="hidden" name="aet_prediction" id="aet-val-<%= m.id %>" value="<%= m.aet_prediction || '' %>">
+            <% } %>
 
             <div class="predict-opts">
               <div class="predict-opt">
-                <input type="radio" id="pa_<%= m.id %>" name="prediction" value="team_a"
-                       <%= m.prediction === 'team_a' ? 'checked' : '' %>>
-                <label for="pa_<%= m.id %>" title="<%= m.team_a %>"><%= m.team_a %></label>
+                <button type="button" class="pred-btn<%= m.prediction === 'team_a' ? ' pred-selected' : '' %>"
+                        title="<%= m.team_a %>"
+                        onclick="selectPred(<%= m.id %>, 'prediction', 'team_a', this)"><%= m.team_a %></button>
               </div>
               <% if (!m.is_knockout) { %>
               <div class="predict-opt">
-                <input type="radio" id="pd_<%= m.id %>" name="prediction" value="draw"
-                       <%= m.prediction === 'draw' ? 'checked' : '' %>>
-                <label for="pd_<%= m.id %>">🤝 Draw</label>
+                <button type="button" class="pred-btn<%= m.prediction === 'draw' ? ' pred-selected' : '' %>"
+                        onclick="selectPred(<%= m.id %>, 'prediction', 'draw', this)">🤝 Draw</button>
               </div>
               <% } %>
               <div class="predict-opt">
-                <input type="radio" id="pb_<%= m.id %>" name="prediction" value="team_b"
-                       <%= m.prediction === 'team_b' ? 'checked' : '' %>>
-                <label for="pb_<%= m.id %>" title="<%= m.team_b %>"><%= m.team_b %></label>
+                <button type="button" class="pred-btn<%= m.prediction === 'team_b' ? ' pred-selected' : '' %>"
+                        title="<%= m.team_b %>"
+                        onclick="selectPred(<%= m.id %>, 'prediction', 'team_b', this)"><%= m.team_b %></button>
               </div>
             </div>
 
             <% if (m.is_knockout) { %>
             <div class="predict-aet">
               <span>Decided in:</span>
-              <div>
-                <input type="radio" id="a90_<%= m.id %>" name="aet_prediction" value="90min"
-                       <%= m.aet_prediction === '90min' ? 'checked' : '' %>>
-                <label for="a90_<%= m.id %>">90 min</label>
-              </div>
-              <div>
-                <input type="radio" id="aet_<%= m.id %>" name="aet_prediction" value="aet"
-                       <%= m.aet_prediction === 'aet' ? 'checked' : '' %>>
-                <label for="aet_<%= m.id %>">AET / Pens</label>
-              </div>
+              <button type="button" class="aet-btn<%= m.aet_prediction === '90min' ? ' aet-selected' : '' %>"
+                      onclick="selectPred(<%= m.id %>, 'aet', '90min', this)">90 min</button>
+              <button type="button" class="aet-btn<%= m.aet_prediction === 'aet' ? ' aet-selected' : '' %>"
+                      onclick="selectPred(<%= m.id %>, 'aet', 'aet', this)">AET / Pens</button>
             </div>
             <% } %>
 
@@ -341,40 +339,16 @@ const savedPredictions = {
 
 const pending = {};
 
-// saveSingle: reads the form state at click time — no stale pending, no change tracking.
-async function saveSingle(matchId, isKnockout) {
-  const predEl = document.querySelector(`input[name="pred_${matchId}"]:checked`);
-  if (!predEl) { alert('Please select a team first.'); return; }
-  const pred = predEl.value;
-  let aet = null;
-  if (isKnockout) {
-    const aetEl = document.querySelector(`input[name="aet_${matchId}"]:checked`);
-    if (!aetEl) { alert('Please select whether it ends in 90 min or AET.'); return; }
-    aet = aetEl.value;
-  }
-  const btn = document.getElementById('save-btn-' + matchId);
-  if (btn) { btn.disabled = true; btn.textContent = 'Saving…'; }
-  try {
-    const resp = await fetch('/matches/predict-batch', {
-      method: 'POST', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ predictions: [{ matchId, prediction: pred, aet_prediction: aet }] })
-    });
-    const data = await resp.json();
-    if (data.saved && data.saved.length > 0) {
-      window.location.reload();
-    } else {
-      const msg = data.errors && data.errors.length ? data.errors.join('\n') : 'Save failed — try again.';
-      alert('⚠️ ' + msg);
-      if (btn) { btn.disabled = false; btn.textContent = '💾 Save'; }
-    }
-  } catch(e) {
-    alert('Save failed — try again.');
-    if (btn) { btn.disabled = false; btn.textContent = '💾 Save'; }
-  }
-}
-
-function setPending(matchId, isKnockout) {
-  // No-op: pending/Save All retained for compatibility but saveSingle is the primary path.
+// selectPred: directly set the hidden input value and toggle visual selection.
+// No radio inputs, no browser label-click magic — 100% reliable.
+function selectPred(matchId, field, value, btn) {
+  const inputId = field === 'prediction' ? 'pred-val-' + matchId : 'aet-val-' + matchId;
+  document.getElementById(inputId).value = value;
+  const btnClass   = field === 'prediction' ? 'pred-btn'     : 'aet-btn';
+  const selClass   = field === 'prediction' ? 'pred-selected' : 'aet-selected';
+  const container  = btn.closest(field === 'prediction' ? '.predict-opts' : '.predict-aet');
+  container.querySelectorAll('.' + btnClass).forEach(b => b.classList.remove(selClass));
+  btn.classList.add(selClass);
 }
 
 function updateSaveBar() {
