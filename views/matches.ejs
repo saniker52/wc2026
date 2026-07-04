@@ -352,17 +352,16 @@ function setPending(matchId, isKnockout) {
     if (aetEl) {
       aet = aetEl.value;
     } else {
-      // Nothing selected yet — fall back to previously saved value, or default to '90min'
-      const saved = savedPredictions[matchId];
-      aet = (saved && saved.aet_prediction) || '90min';
-      // Also check the default radio so the UI reflects this
+      // No AET radio selected — use saved value or default to 90min
+      const sv = savedPredictions[matchId];
+      aet = (sv && sv.aet_prediction) || '90min';
       const defaultEl = document.querySelector(`input[name="aet_${matchId}"][value="${aet}"]`);
       if (defaultEl) defaultEl.checked = true;
     }
   }
-  const saved = savedPredictions[matchId];
-  const unchanged = saved && saved.prediction === pred && saved.aet_prediction === aet;
-  if (unchanged) { delete pending[matchId]; } else { pending[matchId] = { prediction: pred, aet_prediction: aet }; }
+  // Always write current state — never remove from pending based on "unchanged" comparison,
+  // as that logic caused saves to silently drop when only one field changed.
+  pending[matchId] = { prediction: pred, aet_prediction: aet };
   updateSaveBar();
 }
 
