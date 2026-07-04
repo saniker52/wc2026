@@ -14,7 +14,7 @@
   margin-bottom: 8px;
   flex-wrap: wrap;
 }
-.predict-opt input[type="radio"] { display: none; }
+.predict-opt input[type="radio"] { position: absolute; opacity: 0; width: 0; height: 0; pointer-events: none; }
 .predict-opt label {
   flex: 1;
   min-width: 0;
@@ -46,7 +46,7 @@
   font-size: .8rem;
   color: var(--text-dim);
 }
-.predict-aet input[type="radio"] { display: none; }
+.predict-aet input[type="radio"] { position: absolute; opacity: 0; width: 0; height: 0; pointer-events: none; }
 .predict-aet label {
   padding: 5px 14px;
   border: 1.5px solid var(--border);
