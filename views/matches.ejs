@@ -278,46 +278,39 @@
         <% if (!m.result && !m.is_locked && !user.is_admin) { %>
         <div id="predict-form-<%= m.id %>" class="predict-form" style="display:none">
 
-          <form method="POST" action="/matches/<%= m.id %>/predict" style="margin:0">
-            <input type="hidden" name="_returnTo" value="/matches">
-            <input type="hidden" name="prediction" id="pred-val-<%= m.id %>" value="<%= m.prediction || '' %>">
-            <% if (m.is_knockout) { %>
-            <input type="hidden" name="aet_prediction" id="aet-val-<%= m.id %>" value="<%= m.aet_prediction || '' %>">
-            <% } %>
-
-            <div class="predict-opts">
-              <div class="predict-opt">
-                <button type="button" class="pred-btn<%= m.prediction === 'team_a' ? ' pred-selected' : '' %>"
-                        title="<%= m.team_a %>"
-                        onclick="selectPred(<%= m.id %>, 'prediction', 'team_a', this)"><%= m.team_a %></button>
-              </div>
-              <% if (!m.is_knockout) { %>
-              <div class="predict-opt">
-                <button type="button" class="pred-btn<%= m.prediction === 'draw' ? ' pred-selected' : '' %>"
-                        onclick="selectPred(<%= m.id %>, 'prediction', 'draw', this)">🤝 Draw</button>
-              </div>
-              <% } %>
-              <div class="predict-opt">
-                <button type="button" class="pred-btn<%= m.prediction === 'team_b' ? ' pred-selected' : '' %>"
-                        title="<%= m.team_b %>"
-                        onclick="selectPred(<%= m.id %>, 'prediction', 'team_b', this)"><%= m.team_b %></button>
-              </div>
+          <div class="predict-opts">
+            <div class="predict-opt">
+              <button type="button" class="pred-btn<%= m.prediction === 'team_a' ? ' pred-selected' : '' %>"
+                      title="<%= m.team_a %>"
+                      onclick="selectPred(<%= m.id %>, 'prediction', 'team_a', this)"><%= m.team_a %></button>
             </div>
-
-            <% if (m.is_knockout) { %>
-            <div class="predict-aet">
-              <span>Decided in:</span>
-              <button type="button" class="aet-btn<%= m.aet_prediction === '90min' ? ' aet-selected' : '' %>"
-                      onclick="selectPred(<%= m.id %>, 'aet', '90min', this)">90 min</button>
-              <button type="button" class="aet-btn<%= m.aet_prediction === 'aet' ? ' aet-selected' : '' %>"
-                      onclick="selectPred(<%= m.id %>, 'aet', 'aet', this)">AET / Pens</button>
+            <% if (!m.is_knockout) { %>
+            <div class="predict-opt">
+              <button type="button" class="pred-btn<%= m.prediction === 'draw' ? ' pred-selected' : '' %>"
+                      onclick="selectPred(<%= m.id %>, 'prediction', 'draw', this)">🤝 Draw</button>
             </div>
             <% } %>
+            <div class="predict-opt">
+              <button type="button" class="pred-btn<%= m.prediction === 'team_b' ? ' pred-selected' : '' %>"
+                      title="<%= m.team_b %>"
+                      onclick="selectPred(<%= m.id %>, 'prediction', 'team_b', this)"><%= m.team_b %></button>
+            </div>
+          </div>
 
-            <button type="submit" class="btn btn-primary" style="width:100%;margin-top:6px;padding:9px">
-              💾 Save
-            </button>
-          </form>
+          <% if (m.is_knockout) { %>
+          <div class="predict-aet">
+            <span>Decided in:</span>
+            <button type="button" class="aet-btn<%= m.aet_prediction === '90min' ? ' aet-selected' : '' %>"
+                    onclick="selectPred(<%= m.id %>, 'aet', '90min', this)">90 min</button>
+            <button type="button" class="aet-btn<%= m.aet_prediction === 'aet' ? ' aet-selected' : '' %>"
+                    onclick="selectPred(<%= m.id %>, 'aet', 'aet', this)">AET / Pens</button>
+          </div>
+          <% } %>
+
+          <button type="button" class="btn btn-primary" style="width:100%;margin-top:6px;padding:9px"
+                  onclick="savePrediction(<%= m.id %>, <%= !!m.is_knockout %>, this)">
+            💾 Save
+          </button>
 
         </div>
         <% } %>
@@ -331,25 +324,70 @@
 
 <!-- Seed saved predictions for change-detection -->
 <script>
-const savedPredictions = {
-  <% matches.forEach(m => { if (m.prediction) { %>
-  <%= m.id %>: { prediction: '<%= m.prediction %>', aet_prediction: <%= m.aet_prediction ? `'${m.aet_prediction}'` : 'null' %> },
-  <% } }) %>
+// matchSelections: plain JS object tracking current selection per match.
+// Initialized from server-rendered data. Updated directly by button clicks.
+// Completely decoupled from DOM state — 100% reliable.
+const matchSelections = {};
+<% matches.forEach(m => { %>
+matchSelections[<%= m.id %>] = {
+  prediction: <%- m.prediction ? `'${m.prediction}'` : 'null' %>,
+  aet_prediction: <%- m.aet_prediction ? `'${m.aet_prediction}'` : 'null' %>
 };
+<% }); %>
 
-const pending = {};
-
-// selectPred: directly set the hidden input value and toggle visual selection.
-// No radio inputs, no browser label-click magic — 100% reliable.
 function selectPred(matchId, field, value, btn) {
-  const inputId = field === 'prediction' ? 'pred-val-' + matchId : 'aet-val-' + matchId;
-  document.getElementById(inputId).value = value;
-  const btnClass   = field === 'prediction' ? 'pred-btn'     : 'aet-btn';
-  const selClass   = field === 'prediction' ? 'pred-selected' : 'aet-selected';
-  const container  = btn.closest(field === 'prediction' ? '.predict-opts' : '.predict-aet');
-  container.querySelectorAll('.' + btnClass).forEach(b => b.classList.remove(selClass));
+  // Update the in-memory object — this is what gets saved
+  if (field === 'aet') {
+    matchSelections[matchId].aet_prediction = value;
+  } else {
+    matchSelections[matchId].prediction = value;
+  }
+  // Update visual state
+  const btnClass = field === 'prediction' ? 'pred-btn' : 'aet-btn';
+  const selClass = field === 'prediction' ? 'pred-selected' : 'aet-selected';
+  btn.closest(field === 'prediction' ? '.predict-opts' : '.predict-aet')
+     .querySelectorAll('.' + btnClass)
+     .forEach(b => b.classList.remove(selClass));
   btn.classList.add(selClass);
 }
+
+async function savePrediction(matchId, isKnockout, saveBtn) {
+  const sel = matchSelections[matchId] || {};
+  if (!sel.prediction) { alert('Please select a team.'); return; }
+  if (isKnockout && !['90min', 'aet'].includes(sel.aet_prediction)) {
+    alert('Please select 90 min or AET.'); return;
+  }
+  saveBtn.disabled = true;
+  saveBtn.textContent = 'Saving…';
+  try {
+    const resp = await fetch('/matches/predict-batch', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        predictions: [{
+          matchId,
+          prediction: sel.prediction,
+          aet_prediction: isKnockout ? sel.aet_prediction : null
+        }]
+      })
+    });
+    const data = await resp.json();
+    if (data.saved && data.saved.length > 0) {
+      window.location.reload();
+    } else {
+      const msg = data.errors && data.errors.length ? data.errors.join('\n') : 'Save failed — try again.';
+      alert('⚠️ ' + msg);
+      saveBtn.disabled = false;
+      saveBtn.textContent = '💾 Save';
+    }
+  } catch(e) {
+    alert('Save failed — try again.');
+    saveBtn.disabled = false;
+    saveBtn.textContent = '💾 Save';
+  }
+}
+
+const pending = {};
 
 function updateSaveBar() {
   const count = Object.keys(pending).length;
