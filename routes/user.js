@@ -113,11 +113,10 @@ router.get('/dashboard', requireLogin, (req, res) => {
                     FROM matches m LEFT JOIN results r ON r.match_id = m.id`;
 
   let navList;
-  if (isAdmin) {
+  if (isKnockoutRound) {
+    // Knockout stage: show every match across all rounds so users can navigate
+    // back through completed matches and forward through upcoming ones
     navList = db.prepare(`${NAV_COLS} ORDER BY m.match_time ASC`).all();
-  } else if (isKnockoutRound && activeRound) {
-    // All matches of this knockout round — past, present, future
-    navList = db.prepare(`${NAV_COLS} WHERE m.round = ? ORDER BY m.match_time ASC`).all(activeRound);
   } else {
     // Group stage: active matchday window
     navList = db.prepare(`${NAV_COLS}
