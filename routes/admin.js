@@ -529,4 +529,244 @@ router.get('/export/leaderboard', (req, res) => {
   res.send(csv);
 });
 
+// ── PDF Tournament Report ─────────────────────────────────────────────────────
+router.get('/report/pdf', (req, res) => {
+  const PDFDocument = require('pdfkit');
+  const db = getDb();
+
+  // ── Data gathering ──────────────────────────────────────────────────────────
+  const rows = computeLeaderboard(db);
+
+  const allMatches  = db.prepare('SELECT * FROM matches ORDER BY match_time ASC').all();
+  const allResults  = db.prepare('SELECT r.*, m.team_a, m.team_b, m.round, m.is_knockout FROM results r JOIN matches m ON m.id = r.match_id').all();
+  const allUsers    = db.prepare('SELECT id, display_name FROM users WHERE is_admin = 0').all();
+  const allPreds    = db.prepare('SELECT * FROM predictions').all();
+
+  const totalMatches  = allMatches.length;
+  const played        = allResults.length;
+  const pending       = totalMatches - played;
+  const totalPreds    = allPreds.length;
+  const maxPossible   = allUsers.length * totalMatches;
+
+  // Per-round stats
+  const ROUND_ORDER = ['group','r32','r16','qf','sf','3rd','final'];
+  const ROUND_LABELS = { group:'Group Stage', r32:'Round of 32', r16:'Round of 16', qf:'Quarterfinals', sf:'Semifinals', '3rd':'3rd Place', final:'Final' };
+  const roundStats = {};
+  ROUND_ORDER.forEach(r => { roundStats[r] = { played:0, total:0 }; });
+  allMatches.forEach(m => { if (roundStats[m.round]) roundStats[m.round].total++; });
+  allResults.forEach(r => { if (roundStats[r.round]) roundStats[r.round].played++; });
+
+  // AET/Penalties breakdown
+  const aetCount = allResults.filter(r => r.aet_result === 'aet').length;
+  const normalCount = allResults.filter(r => r.aet_result === '90min').length;
+
+  // Top scorers
+  const top3 = rows.slice(0, 3);
+
+  // Most correct predictions
+  const predMap = {};
+  allPreds.forEach(p => { if (!predMap[p.user_id]) predMap[p.user_id] = []; predMap[p.user_id].push(p); });
+  const resultMap = {};
+  allResults.forEach(r => { resultMap[r.match_id] = r; });
+  const matchMap = {};
+  allMatches.forEach(m => { matchMap[m.id] = m; });
+
+  // Match with lowest correct % (biggest upset)
+  let hardestMatch = null, hardestPct = 101;
+  allResults.forEach(r => {
+    const preds = allPreds.filter(p => p.match_id === r.match_id && p.prediction);
+    if (preds.length === 0) return;
+    const correct = preds.filter(p => p.prediction === r.result).length;
+    const pct = (correct / preds.length) * 100;
+    if (pct < hardestPct) { hardestPct = pct; hardestMatch = r; }
+  });
+
+  // Prize pool
+  const PRIZES = [200, 80, 50];
+  const prizeMap = {};
+  const byRank = {};
+  rows.forEach(r => { if (!byRank[r.rank]) byRank[r.rank] = []; byRank[r.rank].push(r); });
+  Object.entries(byRank).forEach(([rankStr, group]) => {
+    const start = parseInt(rankStr);
+    let total = 0;
+    for (let i = start; i < start + group.length; i++) if (i <= PRIZES.length) total += PRIZES[i-1];
+    if (total > 0) group.forEach(r => { prizeMap[r.id] = total / group.length; });
+  });
+
+  const now = new Date();
+  const kwt = new Date(now.getTime() + 3*60*60*1000);
+  const dateStr = kwt.toLocaleString('en-GB', { day:'2-digit', month:'short', year:'numeric', hour:'2-digit', minute:'2-digit', timeZone:'UTC' }) + ' (Kuwait Time)';
+
+  // ── PDF Construction ────────────────────────────────────────────────────────
+  const doc = new PDFDocument({ size: 'A4', margin: 50, info: { Title: 'Chalet 1267 – WC 2026 Tournament Report', Author: 'Chalet 1267' } });
+
+  res.setHeader('Content-Type', 'application/pdf');
+  res.setHeader('Content-Disposition', 'attachment; filename="chalet1267-wc2026-report.pdf"');
+  doc.pipe(res);
+
+  const W = doc.page.width - 100; // usable width
+  const GOLD = '#B8860B';
+  const DARK = '#1a1a2e';
+  const GRAY = '#555555';
+  const LGRAY = '#cccccc';
+
+  // ── Cover header ────────────────────────────────────────────────────────────
+  doc.rect(0, 0, doc.page.width, 120).fill(DARK);
+  doc.fill('#ffffff').fontSize(22).font('Helvetica-Bold')
+     .text('CHALET 1267', 50, 30, { align: 'center', width: doc.page.width - 100 });
+  doc.fill(GOLD).fontSize(13).font('Helvetica')
+     .text('FIFA World Cup 2026 — Tournament Predictions Report', 50, 58, { align: 'center', width: doc.page.width - 100 });
+  doc.fill('#aaaaaa').fontSize(9)
+     .text(`Generated: ${dateStr}`, 50, 84, { align: 'center', width: doc.page.width - 100 });
+
+  doc.y = 140;
+
+  // ── Tournament Snapshot ─────────────────────────────────────────────────────
+  doc.fill(DARK).fontSize(13).font('Helvetica-Bold').text('Tournament Snapshot', 50, doc.y);
+  doc.moveDown(0.4);
+  doc.moveTo(50, doc.y).lineTo(50 + W, doc.y).strokeColor(GOLD).lineWidth(1.5).stroke();
+  doc.moveDown(0.5);
+
+  const snap = [
+    ['Total Matches', `${played} / ${totalMatches} played (${pending} remaining)`],
+    ['Predictions Submitted', `${totalPreds.toLocaleString()} / ${maxPossible.toLocaleString()} possible`],
+    ['Decided in Extra Time / Pens', `${aetCount} matches (${normalCount} in 90 min)`],
+    ['Players Competing', `${allUsers.length}`],
+  ];
+  snap.forEach(([label, val]) => {
+    doc.fill(GRAY).fontSize(9).font('Helvetica-Bold').text(label, 50, doc.y, { continued: true, width: 200 });
+    doc.fill('#222222').font('Helvetica').text(`  ${val}`, { width: W - 200 });
+  });
+
+  // Per-round breakdown
+  doc.moveDown(0.5);
+  doc.fill(DARK).fontSize(10).font('Helvetica-Bold').text('Matches by Round', 50, doc.y);
+  doc.moveDown(0.3);
+  ROUND_ORDER.forEach(r => {
+    const s = roundStats[r];
+    if (s.total === 0) return;
+    const bar = s.total > 0 ? Math.round((s.played / s.total) * 100) : 0;
+    doc.fill(GRAY).fontSize(8.5).font('Helvetica')
+       .text(`${ROUND_LABELS[r]}`, 50, doc.y, { continued: true, width: 130 });
+    doc.fill('#222222').text(`${s.played}/${s.total} played`, { width: 80, continued: true });
+    doc.fill(bar === 100 ? '#16a34a' : GOLD).text(`(${bar}% complete)`, { width: 120 });
+  });
+
+  // ── Leaderboard Table ───────────────────────────────────────────────────────
+  doc.moveDown(1);
+  doc.fill(DARK).fontSize(13).font('Helvetica-Bold').text('Final Leaderboard', 50, doc.y);
+  doc.moveDown(0.4);
+  doc.moveTo(50, doc.y).lineTo(50 + W, doc.y).strokeColor(GOLD).lineWidth(1.5).stroke();
+  doc.moveDown(0.5);
+
+  // Table header
+  const cols = { rank:30, name:120, grp:40, r32:35, r16:35, qf:35, sf:35, fin:38, bon:38, tot:40, prize:50 };
+  const startX = 50;
+  let cx = startX;
+
+  doc.rect(startX, doc.y - 3, W, 16).fill('#f0f0f0');
+  const headerY = doc.y;
+  doc.fill(DARK).fontSize(7.5).font('Helvetica-Bold');
+  const headers = [['#',cols.rank],['Player',cols.name],['Group',cols.grp],['R32',cols.r32],['R16',cols.r16],['QF',cols.qf],['SF',cols.sf],['3rd/Fin',cols.fin],['Bonus',cols.bon],['Total',cols.tot],['Prize KD',cols.prize]];
+  headers.forEach(([h, w]) => {
+    doc.text(h, cx + 2, headerY, { width: w - 4, align: h === 'Player' ? 'left' : 'center' });
+    cx += w;
+  });
+  doc.moveDown(0.3);
+
+  // Table rows
+  rows.forEach((r, i) => {
+    const rowY = doc.y;
+    const isTop3 = r.rank <= 3;
+    if (i % 2 === 0) doc.rect(startX, rowY - 2, W, 15).fill('#fafafa').stroke();
+    if (isTop3) doc.rect(startX, rowY - 2, 3, 15).fill(GOLD);
+
+    const prize = prizeMap[r.id];
+    const prizeStr = prize ? (Number.isInteger(prize) ? `${prize}` : prize.toFixed(1)) : '—';
+    const medal = r.rank === 1 ? '1.' : r.rank === 2 ? '2.' : r.rank === 3 ? '3.' : `${r.rank}.`;
+    const cells = [
+      [medal, cols.rank, isTop3 ? GOLD : GRAY],
+      [r.display_name, cols.name, isTop3 ? DARK : '#333333'],
+      [`${r.group_pts}`, cols.grp, GRAY],
+      [`${r.r32_pts||0}`, cols.r32, GRAY],
+      [`${r.r16_pts||0}`, cols.r16, GRAY],
+      [`${r.qf_pts||0}`, cols.qf, GRAY],
+      [`${r.sf_pts||0}`, cols.sf, GRAY],
+      [`${r.final_pts||0}`, cols.fin, GRAY],
+      [`${r.bonus_pts||0}`, cols.bon, '#b45309'],
+      [`${r.total}`, cols.tot, isTop3 ? GOLD : DARK],
+      [prizeStr, cols.prize, prize ? GOLD : GRAY],
+    ];
+
+    cx = startX;
+    doc.fontSize(7.5).font(isTop3 ? 'Helvetica-Bold' : 'Helvetica');
+    cells.forEach(([val, w, color]) => {
+      doc.fill(color).text(val, cx + 2, rowY, { width: w - 4, align: val === r.display_name ? 'left' : 'center' });
+      cx += w;
+    });
+    doc.moveDown(0.22);
+
+    // Page break if near bottom
+    if (doc.y > doc.page.height - 100) {
+      doc.addPage();
+      doc.y = 50;
+    }
+  });
+
+  // ── Key Insights ────────────────────────────────────────────────────────────
+  doc.moveDown(1);
+  if (doc.y > doc.page.height - 180) { doc.addPage(); doc.y = 50; }
+
+  doc.fill(DARK).fontSize(13).font('Helvetica-Bold').text('Key Insights', 50, doc.y);
+  doc.moveDown(0.4);
+  doc.moveTo(50, doc.y).lineTo(50 + W, doc.y).strokeColor(GOLD).lineWidth(1.5).stroke();
+  doc.moveDown(0.6);
+
+  const insights = [];
+
+  if (top3[0]) insights.push(`🏆 Leader: ${top3[0].display_name} is in first place with ${top3[0].total} points (${top3[0].correct} correct predictions).`);
+  if (top3[1] && top3[1].total === top3[0].total) insights.push(`⚖️  ${top3[0].display_name} and ${top3[1].display_name} are tied at ${top3[0].total} pts — prize will be split equally.`);
+  if (hardestMatch) {
+    const hm = matchMap[hardestMatch.match_id];
+    const winner = hardestMatch.result === 'team_a' ? hm.team_a : hardestMatch.result === 'draw' ? 'Draw' : hm.team_b;
+    insights.push(`😮 Biggest upset: ${hm.team_a} vs ${hm.team_b} — only ${hardestPct.toFixed(0)}% predicted the correct result (${winner}).`);
+  }
+  if (aetCount > 0) insights.push(`⏱️  ${aetCount} knockout match${aetCount > 1 ? 'es' : ''} went to extra time or penalties — bonus point predictions mattered.`);
+  if (pending > 0) insights.push(`📅 ${pending} match${pending > 1 ? 'es' : ''} still remaining — standings may change.`);
+
+  // Prize summary
+  insights.push(`💰 Prize pool: 330 KD total (200 / 80 / 50 KD for 1st/2nd/3rd). Ties split the combined prize equally.`);
+
+  insights.forEach(txt => {
+    doc.fill('#333333').fontSize(9).font('Helvetica').text(txt, 50, doc.y, { width: W, lineGap: 2 });
+    doc.moveDown(0.6);
+  });
+
+  // ── Prize Summary ───────────────────────────────────────────────────────────
+  const prizees = rows.filter(r => prizeMap[r.id]);
+  if (prizees.length > 0) {
+    doc.moveDown(0.5);
+    doc.fill(DARK).fontSize(11).font('Helvetica-Bold').text('Projected Prize Payouts', 50, doc.y);
+    doc.moveDown(0.4);
+    doc.moveTo(50, doc.y).lineTo(50 + W, doc.y).strokeColor(GOLD).lineWidth(1).stroke();
+    doc.moveDown(0.5);
+    prizees.forEach(r => {
+      const p = prizeMap[r.id];
+      const medal = r.rank === 1 ? '1st' : r.rank === 2 ? '2nd' : '3rd';
+      doc.fill(GOLD).fontSize(9).font('Helvetica-Bold')
+         .text(`${medal} Place — ${r.display_name}`, 50, doc.y, { continued: true, width: W - 80 });
+      doc.fill(GOLD).text(`${Number.isInteger(p) ? p : p.toFixed(1)} KD`, { width: 80, align: 'right' });
+    });
+  }
+
+  // ── Footer ──────────────────────────────────────────────────────────────────
+  doc.moveDown(2);
+  doc.moveTo(50, doc.y).lineTo(50 + W, doc.y).strokeColor(LGRAY).lineWidth(0.5).stroke();
+  doc.moveDown(0.4);
+  doc.fill(LGRAY).fontSize(8).font('Helvetica')
+     .text('Chalet 1267 · WC 2026 Predictions · Private Competition', 50, doc.y, { align: 'center', width: W });
+
+  doc.end();
+});
+
 module.exports = router;
